@@ -4,6 +4,34 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Naresh Kumar — AI/ML Infra Engineer</title>
+<meta name="description" content="Naresh Kumar — systems engineer building AI/ML infrastructure: Linux kernel, eBPF/XDP, DPDK, RDMA/RoCE and GPU networking. Open to roles.">
+<meta name="author" content="Naresh Kumar">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Naresh Kumar — AI/ML Infra Engineer">
+<meta property="og:description" content="Kernel, high-performance networking and AI/ML infrastructure. Projects, benchmarks, writing and developer profiles.">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@naresh_swe24">
+<meta name="theme-color" content="#0a0c10">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Person",
+  "name": "Naresh Kumar",
+  "alternateName": "nareshns2004",
+  "jobTitle": "AI/ML Infrastructure Engineer",
+  "knowsAbout": ["Linux kernel", "eBPF", "XDP", "DPDK", "RDMA", "RoCE", "GPU networking", "AI/ML infrastructure"],
+  "sameAs": [
+    "https://github.com/nareshns2004",
+    "https://www.linkedin.com/in/nareshns2004/",
+    "https://huggingface.co/naresns2004",
+    "https://hub.docker.com/u/nareshns2004",
+    "https://leetcode.com/u/nareshns2004/",
+    "https://substack.com/@nareshns2004",
+    "https://x.com/naresh_swe24",
+    "https://me.developers.google.com/u/nareshns2004"
+  ]
+}
+</script>
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -417,6 +445,56 @@
     white-space: nowrap; padding-top: 0.25rem;
   }
 
+  /* ─── PLATFORMS ─── */
+  .platform-group-label {
+    font-size: 0.7rem; color: var(--text-dim);
+    letter-spacing: 0.15em; text-transform: uppercase;
+    margin: 0 0 1rem;
+  }
+  .platform-group-label:not(:first-of-type) { margin-top: 2.5rem; }
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1rem;
+  }
+  .platform-card {
+    display: flex; flex-direction: column; gap: 0.6rem;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
+    text-decoration: none; color: var(--text);
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+  }
+  .platform-card:hover { border-color: var(--pc, var(--accent)); background: var(--bg3); transform: translateY(-2px); }
+  .platform-top { display: flex; align-items: center; gap: 0.85rem; }
+  .platform-badge {
+    width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 800; font-size: 0.85rem;
+    color: var(--pc, var(--accent));
+    background: color-mix(in srgb, var(--pc, var(--accent)) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pc, var(--accent)) 30%, transparent);
+  }
+  .platform-name { font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
+  .platform-handle { font-size: 0.72rem; color: var(--text-dim); }
+  .platform-desc { font-size: 0.78rem; color: var(--text-dim); line-height: 1.7; flex: 1; }
+  .platform-cta { font-size: 0.72rem; color: var(--pc, var(--accent)); letter-spacing: 0.05em; }
+
+  .hero-social { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2rem; }
+  .hero-social a {
+    font-size: 0.72rem; letter-spacing: 0.05em;
+    color: var(--text-dim); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 3px;
+    padding: 0.2rem 0.7rem;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .hero-social a:hover { color: var(--accent); border-color: var(--accent); }
+
+  .footer-links { display: flex; flex-wrap: wrap; gap: 1rem; justify-content: center; }
+  .footer-links a { color: var(--text-dim); text-decoration: none; transition: color 0.2s; }
+  .footer-links a:hover { color: var(--accent); }
+
   /* ─── CONTACT ─── */
   .contact-grid {
     display: grid;
@@ -558,6 +636,7 @@
     <li><a href="#skills">Skills</a></li>
     <li><a href="#blog">Blog</a></li>
     <li><a href="#achievements">Wins</a></li>
+    <li><a href="#platforms">Profiles</a></li>
     <li><a href="#contact">Contact</a></li>
   </ul>
   <div class="nav-status">
@@ -596,6 +675,15 @@
   <div class="hero-cta">
     <a href="#blog" class="btn btn-primary">→ Read my blog</a>
     <a href="#contact" class="btn btn-outline">Get in touch</a>
+  </div>
+  <div class="hero-social" aria-label="Profiles">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/naresns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://hub.docker.com/u/nareshns2004" target="_blank" rel="noopener">Docker Hub</a>
+    <a href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener">LeetCode</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://substack.com/@nareshns2004" target="_blank" rel="noopener">Substack</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
   </div>
 </div>
 
@@ -1032,35 +1120,123 @@
   </div>
 </section>
 
+<!-- PLATFORMS -->
+<section id="platforms">
+  <div class="section-header">
+    <span class="section-num">05</span>
+    <h2 class="section-title">Developer Profiles</h2>
+    <div class="section-line"></div>
+  </div>
+
+  <div class="platform-group-label">// Code, models &amp; practice</div>
+  <div class="platform-grid">
+      <a href="https://github.com/nareshns2004" class="platform-card fade-in" style="--pc:#e2e8f0" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">GH</div>
+          <div><div class="platform-name">GitHub</div><div class="platform-handle">@nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Source for my eBPF/XDP, DPDK and networking experiments, benchmarks and upstream contributions.</div>
+        <div class="platform-cta">View repositories ↗</div>
+      </a>
+      <a href="https://huggingface.co/naresns2004" class="platform-card fade-in" style="--pc:#f59e0b" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">🤗</div>
+          <div><div class="platform-name">Hugging Face</div><div class="platform-handle">@naresns2004</div></div>
+        </div>
+        <div class="platform-desc">Models, datasets and Spaces from my AI/ML work.</div>
+        <div class="platform-cta">Browse profile ↗</div>
+      </a>
+      <a href="https://hub.docker.com/u/nareshns2004" class="platform-card fade-in" style="--pc:#38bdf8" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">Dk</div>
+          <div><div class="platform-name">Docker Hub</div><div class="platform-handle">@nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Container images for reproducible testbeds and ML/infra tooling.</div>
+        <div class="platform-cta">View images ↗</div>
+      </a>
+      <a href="https://leetcode.com/u/nareshns2004/" class="platform-card fade-in" style="--pc:#f59e0b" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">LC</div>
+          <div><div class="platform-name">LeetCode</div><div class="platform-handle">@nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Algorithms and data-structures practice — problem-solving fundamentals.</div>
+        <div class="platform-cta">See progress ↗</div>
+      </a>
+  </div>
+
+  <div class="platform-group-label">// Writing &amp; community</div>
+  <div class="platform-grid">
+      <a href="https://www.linkedin.com/in/nareshns2004/" class="platform-card fade-in" style="--pc:#0ea5e9" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">in</div>
+          <div><div class="platform-name">LinkedIn</div><div class="platform-handle">/in/nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Professional background, experience and the best place to reach me about roles.</div>
+        <div class="platform-cta">Connect ↗</div>
+      </a>
+      <a href="https://substack.com/@nareshns2004" class="platform-card fade-in" style="--pc:#ff6719" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">Sx</div>
+          <div><div class="platform-name">Substack</div><div class="platform-handle">@nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Long-form write-ups on kernel, networking and AI infrastructure.</div>
+        <div class="platform-cta">Read & subscribe ↗</div>
+      </a>
+      <a href="https://x.com/naresh_swe24" class="platform-card fade-in" style="--pc:#e2e8f0" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">𝕏</div>
+          <div><div class="platform-name">X (Twitter)</div><div class="platform-handle">@naresh_swe24</div></div>
+        </div>
+        <div class="platform-desc">Short updates, learning-in-public notes and links.</div>
+        <div class="platform-cta">Follow ↗</div>
+      </a>
+      <a href="https://me.developers.google.com/u/nareshns2004" class="platform-card fade-in" style="--pc:#4285f4" target="_blank" rel="noopener">
+        <div class="platform-top">
+          <div class="platform-badge">G</div>
+          <div><div class="platform-name">Google Developers</div><div class="platform-handle">u/nareshns2004</div></div>
+        </div>
+        <div class="platform-desc">Google Developer Program profile — badges and learning progress.</div>
+        <div class="platform-cta">View profile ↗</div>
+      </a>
+  </div>
+</section>
+
 <!-- CONTACT -->
 <section id="contact">
   <div class="section-header">
-    <span class="section-num">05</span>
+    <span class="section-num">06</span>
     <h2 class="section-title">Get In Touch</h2>
     <div class="section-line"></div>
   </div>
 
   <div class="contact-grid">
     <div class="contact-info">
-      <a href="https://linkedin.com/in/nareshns2004" class="contact-link" target="_blank">
+      <a href="https://www.linkedin.com/in/nareshns2004/" class="contact-link" target="_blank" rel="noopener">
         <span class="contact-link-icon">in</span>
         <div>
           <div class="contact-link-label">LinkedIn</div>
           <div class="contact-link-val">linkedin.com/in/nareshns2004</div>
         </div>
       </a>
-      <a href="https://github.com/nareshns2004" class="contact-link" target="_blank">
+      <a href="https://github.com/nareshns2004" class="contact-link" target="_blank" rel="noopener">
         <span class="contact-link-icon">⌥</span>
         <div>
           <div class="contact-link-label">GitHub</div>
           <div class="contact-link-val">github.com/nareshns2004</div>
         </div>
       </a>
-      <a href="mailto:naresh@example.com" class="contact-link">
+      <a href="mailto:nareshns2004@gmail.com" class="contact-link">
         <span class="contact-link-icon">@</span>
         <div>
           <div class="contact-link-label">Email</div>
           <div class="contact-link-val">nareshns2004@gmail.com</div>
+        </div>
+      </a>
+      <a href="https://x.com/naresh_swe24" class="contact-link" target="_blank" rel="noopener">
+        <span class="contact-link-icon">𝕏</span>
+        <div>
+          <div class="contact-link-label">X</div>
+          <div class="contact-link-val">@naresh_swe24</div>
         </div>
       </a>
     </div>
@@ -1078,6 +1254,16 @@
 
 <footer>
   <span>nareshns2004</span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/naresns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://hub.docker.com/u/nareshns2004" target="_blank" rel="noopener">Docker</a>
+    <a href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener">LeetCode</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://substack.com/@nareshns2004" target="_blank" rel="noopener">Substack</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+    <a href="https://me.developers.google.com/u/nareshns2004" target="_blank" rel="noopener">Google Dev</a>
+  </div>
   <span style="color:var(--border-bright)">kernel · networks · AI infra</span>
 </footer>
 
