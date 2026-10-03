@@ -25,7 +25,6 @@
     "https://www.linkedin.com/in/nareshns2004/",
     "https://huggingface.co/nareshns2004",
     "https://hub.docker.com/u/nareshns2004",
-    "https://leetcode.com/u/nareshns2004/",
     "https://substack.com/@nareshns2004",
     "https://x.com/naresh_swe24",
     "https://me.developers.google.com/u/nareshns2004"
@@ -327,24 +326,6 @@
     font-size: 0.72rem;
   }
 
-  .skill-bar-wrap { margin-top: 0.75rem; }
-  .skill-bar-label {
-    display: flex; justify-content: space-between;
-    font-size: 0.7rem; color: var(--text-dim);
-    margin-bottom: 0.3rem;
-  }
-  .skill-bar {
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-  .skill-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 1s ease;
-  }
-
   /* ─── BLOG ─── */
   .blog-grid {
     display: grid;
@@ -358,9 +339,11 @@
     border-radius: 6px;
     padding: 1.75rem;
     transition: border-color 0.2s, transform 0.2s;
-    cursor: pointer;
     position: relative;
     overflow: hidden;
+    display: block;
+    text-decoration: none;
+    color: inherit;
   }
   .blog-card::before {
     content: '';
@@ -581,69 +564,10 @@
     font-size: 0.72rem; color: var(--text-dim);
   }
 
-  /* ─── BLOG MODAL ─── */
-  .modal-overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.85);
-    z-index: 200;
-    align-items: center; justify-content: center;
-    padding: 2rem;
-  }
-  .modal-overlay.open { display: flex; }
-  .modal {
-    background: var(--bg2);
-    border: 1px solid var(--border-bright);
-    border-radius: 8px;
-    max-width: 680px; width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
-    padding: 2rem;
-    position: relative;
-  }
-  .modal-close {
-    position: sticky; top: 0; float: right;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    width: 28px; height: 28px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .modal-close:hover { color: var(--text); border-color: var(--text-dim); }
-  .modal h2 {
-    font-family: var(--font-display);
-    font-size: 1.4rem; font-weight: 800;
-    margin-bottom: 0.5rem; clear: both;
-    line-height: 1.3;
-  }
-  .modal-meta { font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1.5rem; }
-  .modal-body { font-size: 0.85rem; line-height: 1.95; color: var(--text-mid); }
-  .modal-body h3 {
-    font-family: var(--font-display);
-    font-size: 1rem; color: var(--accent);
-    margin: 1.5rem 0 0.5rem;
-  }
-  .modal-body code {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 0.1rem 0.4rem;
-    border-radius: 3px;
-    color: var(--accent3);
-    font-size: 0.8rem;
-  }
-  .modal-body pre {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 1rem;
-    margin: 1rem 0;
-    overflow-x: auto;
-    font-size: 0.78rem;
-    color: var(--accent3);
-    line-height: 1.7;
+  /* ─── FOCUS ─── */
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
   }
 
   /* ─── ANIMATIONS ─── */
@@ -652,6 +576,12 @@
     transition: opacity 0.6s ease, transform 0.6s ease;
   }
   .fade-in.visible { opacity: 1; transform: translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .fade-in { opacity: 1; transform: none; }
+  }
 
   @media (max-width: 768px) {
     .nav-links { display: none; }
@@ -716,7 +646,6 @@
     <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
     <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
     <a href="https://hub.docker.com/u/nareshns2004" target="_blank" rel="noopener">Docker Hub</a>
-    <a href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener">LeetCode</a>
     <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
     <a href="https://substack.com/@nareshns2004" target="_blank" rel="noopener">Substack</a>
     <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
@@ -732,7 +661,7 @@
   </div>
 
   <div class="roadmap-svg-wrap fade-in">
-    <svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" width="100%" style="max-width:100%">
+    <svg viewBox="0 0 1000 520" xmlns="http://www.w3.org/2000/svg" width="100%" style="max-width:100%">
       <defs>
         <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
           <path d="M0,0 L0,6 L6,3 z" fill="#2d3a4a"/>
@@ -905,18 +834,6 @@
       <rect x="230" y="490" width="12" height="12" rx="2" fill="#f59e0b" opacity="0.8"/>
       <text x="248" y="501" fill="#64748b" font-size="9">Advanced / Stretch</text>
 
-      <!-- PROGRESS BAR AREA -->
-      <text x="20" y="530" fill="#64748b" font-size="8.5" letter-spacing="1">OVERALL JOURNEY</text>
-      <rect x="20" y="540" width="800" height="6" rx="3" fill="#1e2630"/>
-      <rect x="20" y="540" width="320" height="6" rx="3" fill="url(#gAcc)"/>
-      <text x="348" y="550" fill="#00d4ff" font-size="9">~40% complete</text>
-
-      <!-- Stage labels on bar -->
-      <text x="20" y="570" fill="#64748b" font-size="8">Foundation</text>
-      <text x="210" y="570" fill="#64748b" font-size="8">Networking</text>
-      <text x="400" y="570" fill="#64748b" font-size="8">Accelerators</text>
-      <text x="590" y="570" fill="#64748b" font-size="8">AI Infra</text>
-      <text x="750" y="570" fill="#64748b" font-size="8">Advanced</text>
     </svg>
   </div>
 </section>
@@ -940,10 +857,6 @@
         <span class="skill-pill">memory mgmt</span>
         <span class="skill-pill">netdev</span>
       </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#00d4ff">85%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:85%;background:#00d4ff"></div></div>
-      </div>
     </div>
 
     <div class="skill-card fade-in">
@@ -955,10 +868,6 @@
         <span class="skill-pill">BPF maps</span>
         <span class="skill-pill">PMD</span>
         <span class="skill-pill">DPDK mbuf</span>
-      </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#00d4ff">80%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:80%;background:#00d4ff"></div></div>
       </div>
     </div>
 
@@ -972,10 +881,6 @@
         <span class="skill-pill">QEMU</span>
         <span class="skill-pill">KVM</span>
       </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#7c3aed">70%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:70%;background:#7c3aed"></div></div>
-      </div>
     </div>
 
     <div class="skill-card fade-in">
@@ -987,10 +892,6 @@
         <span class="skill-pill">RDMA Write</span>
         <span class="skill-pill">RoCE v2</span>
         <span class="skill-pill">ECN/PFC</span>
-      </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#7c3aed">65%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:65%;background:#7c3aed"></div></div>
       </div>
     </div>
 
@@ -1004,10 +905,6 @@
         <span class="skill-pill">Python scripts</span>
         <span class="skill-pill">Go</span>
       </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#10b981">82%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:82%;background:#10b981"></div></div>
-      </div>
     </div>
 
     <div class="skill-card fade-in">
@@ -1019,10 +916,6 @@
         <span class="skill-pill">bpftrace</span>
         <span class="skill-pill">BCC</span>
         <span class="skill-pill">strace / ltrace</span>
-      </div>
-      <div class="skill-bar-wrap">
-        <div class="skill-bar-label"><span>Proficiency</span><span style="color:#10b981">75%</span></div>
-        <div class="skill-bar"><div class="skill-bar-fill" style="width:75%;background:#10b981"></div></div>
       </div>
     </div>
   </div>
@@ -1122,62 +1015,45 @@
 
   <div class="blog-grid">
 
-    <div class="blog-card fade-in" onclick="openModal('blog1')">
+    <a class="blog-card fade-in" href="https://nareshns2004.substack.com/p/virtualization-the-foundation-of" target="_blank" rel="noopener">
       <div class="blog-meta">
-        <span class="blog-tag-badge">eBPF</span>
-        <span>Apr 2025 · 8 min read</span>
+        <span class="blog-tag-badge">Virtualization</span>
+        <span>May 2026 · Substack</span>
       </div>
-      <div class="blog-title">Writing Your First XDP Program: Packet Drop at Line Rate</div>
-      <div class="blog-excerpt">How I built a kernel-bypass packet filter using XDP that processes 14 Mpps on a single core — and what I learned about BPF maps, verifier errors, and the AF_XDP socket interface.</div>
-      <a class="blog-read">Read post →</a>
-    </div>
+      <h3 class="blog-title">Virtualization: The Foundation of Modern Cloud Computing</h3>
+      <p class="blog-excerpt">How virtualization abstracts compute, storage and networking so multiple environments can coexist on the same physical system.</p>
+      <span class="blog-read">Read on Substack ↗</span>
+    </a>
 
-    <div class="blog-card fade-in" onclick="openModal('blog2')">
+    <a class="blog-card fade-in" href="https://nareshns2004.substack.com/p/intels-dpdk-the-userspace-data-plane" target="_blank" rel="noopener">
       <div class="blog-meta">
         <span class="blog-tag-badge">DPDK</span>
-        <span>Mar 2025 · 10 min read</span>
+        <span>May 2026 · Substack</span>
       </div>
-      <div class="blog-title">DPDK PMD Internals: How Poll Mode Drivers Kill Interrupt Overhead</div>
-      <div class="blog-excerpt">A deep dive into DPDK's poll mode driver model, huge page allocation, NIC RSS configuration, and why removing interrupts is the biggest win in high-throughput packet I/O.</div>
-      <a class="blog-read">Read post →</a>
-    </div>
+      <h3 class="blog-title">Intel’s DPDK: The Userspace Data Plane That Rewired High-Performance Networking</h3>
+      <p class="blog-excerpt">Why the traditional Linux network stack hits a wall, and how DPDK’s userspace libraries and drivers bypass it for direct, fast packet I/O.</p>
+      <span class="blog-read">Read on Substack ↗</span>
+    </a>
 
-    <div class="blog-card fade-in" onclick="openModal('blog3')">
+    <a class="blog-card fade-in" href="https://nareshns2004.substack.com/p/llm-operating-system-llm-os-llm-agent" target="_blank" rel="noopener">
       <div class="blog-meta">
-        <span class="blog-tag-badge">RDMA</span>
-        <span>Feb 2025 · 12 min read</span>
+        <span class="blog-tag-badge">AI Systems</span>
+        <span>May 2026 · Substack</span>
       </div>
-      <div class="blog-title">RDMA from Scratch: Queue Pairs, Completions, and Zero-Copy Transfers</div>
-      <div class="blog-excerpt">Understanding the verbs API, how protection domains and memory regions work, and writing a simple RDMA Write benchmark that achieves sub-2μs latency between two hosts.</div>
-      <a class="blog-read">Read post →</a>
-    </div>
+      <h3 class="blog-title">LLM Operating System (LLM OS) — LLM Agent</h3>
+      <p class="blog-excerpt">Comparing the LLM-as-operating-system model with a traditional OS.</p>
+      <span class="blog-read">Read on Substack ↗</span>
+    </a>
 
-    <div class="blog-card fade-in" onclick="openModal('blog4')">
+    <a class="blog-card fade-in" href="https://nareshns2004.substack.com/p/ai-ml-infrastructure-engineering" target="_blank" rel="noopener">
       <div class="blog-meta">
         <span class="blog-tag-badge">AI Infra</span>
-        <span>Jan 2025 · 7 min read</span>
+        <span>Apr 2026 · Substack</span>
       </div>
-      <div class="blog-title">Why AI Clusters Need RoCE: NCCL, Congestion, and PFC Deadlocks</div>
-      <div class="blog-excerpt">How GPU-to-GPU communication in distributed training works, why RoCE v2 is preferred over InfiniBand in hyperscale deployments, and how PFC pause frames can deadlock your whole fabric.</div>
-      <a class="blog-read">Read post →</a>
-    </div>
-
-    <div class="blog-card fade-in" onclick="openModal('blog5')">
-      <div class="blog-meta">
-        <span class="blog-tag-badge">Kernel</span>
-        <span>Dec 2024 · 9 min read</span>
-      </div>
-      <div class="blog-title">SR-IOV Deep Dive: Virtual Functions and the VFIO Framework</div>
-      <div class="blog-excerpt">How SR-IOV splits a physical NIC into virtual functions, how the VFIO driver exposes them safely to VMs, and the performance implications vs. software switching with OVS.</div>
-      <a class="blog-read">Read post →</a>
-    </div>
-
-    <div class="blog-card fade-in" style="border-style:dashed;cursor:default;">
-      <div class="blog-meta"><span class="blog-tag-badge" style="color:#f59e0b;background:rgba(245,158,11,0.1);border-color:rgba(245,158,11,0.2)">Coming Soon</span></div>
-      <div class="blog-title" style="color:var(--text-dim)">GPUDirect RDMA: Bypassing the CPU for DMA Transfers to GPU Memory</div>
-      <div class="blog-excerpt">How GPUDirect allows NIC ↔ GPU direct DMA, the BAR mapping trick, and benchmarking MPI collectives with vs. without GPUDirect enabled.</div>
-      <a class="blog-read" style="color:var(--text-dim)">Draft in progress…</a>
-    </div>
+      <h3 class="blog-title">AI-ML Infrastructure Engineering Roadmap</h3>
+      <p class="blog-excerpt">What AI infrastructure engineering is, and a roadmap through the layers it covers.</p>
+      <span class="blog-read">Read on Substack ↗</span>
+    </a>
 
   </div>
 </section>
@@ -1190,6 +1066,8 @@
     <div class="section-line"></div>
   </div>
 
+  <!-- TODO(naresh): link evidence or cut. None of these claims link to a repo, PR, post or certificate
+       (the 14 Mpps / 1.8μs numbers came from blog posts that don't exist on Substack). Replaced in backlog item 4. -->
   <div class="achieve-list">
 
     <div class="achieve-item fade-in">
@@ -1248,7 +1126,7 @@
     <div class="section-line"></div>
   </div>
 
-  <div class="platform-group-label">// Code, models &amp; practice</div>
+  <div class="platform-group-label">// Code &amp; models</div>
   <div class="platform-grid">
       <a href="https://github.com/nareshns2004" class="platform-card fade-in" style="--pc:#e2e8f0" target="_blank" rel="noopener">
         <div class="platform-top">
@@ -1273,14 +1151,6 @@
         </div>
         <div class="platform-desc">Container images for reproducible testbeds and ML/infra tooling.</div>
         <div class="platform-cta">View images ↗</div>
-      </a>
-      <a href="https://leetcode.com/u/nareshns2004/" class="platform-card fade-in" style="--pc:#f59e0b" target="_blank" rel="noopener">
-        <div class="platform-top">
-          <div class="platform-badge">LC</div>
-          <div><div class="platform-name">LeetCode</div><div class="platform-handle">@nareshns2004</div></div>
-        </div>
-        <div class="platform-desc">Algorithms and data-structures practice — problem-solving fundamentals.</div>
-        <div class="platform-cta">See progress ↗</div>
       </a>
   </div>
 
@@ -1361,7 +1231,6 @@
     <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
     <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
     <a href="https://hub.docker.com/u/nareshns2004" target="_blank" rel="noopener">Docker</a>
-    <a href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener">LeetCode</a>
     <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
     <a href="https://substack.com/@nareshns2004" target="_blank" rel="noopener">Substack</a>
     <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
@@ -1370,153 +1239,7 @@
   <span style="color:var(--border-bright)">kernel · networks · AI infra</span>
 </footer>
 
-<!-- ── BLOG MODALS ── -->
-<div class="modal-overlay" id="modal-bg" onclick="closeModal(event)">
-  <div class="modal" id="modal-box">
-    <button class="modal-close" onclick="closeAllModals()">✕</button>
-    <div id="modal-content"></div>
-  </div>
-</div>
-
 <script>
-const posts = {
-  blog1: {
-    title: "Writing Your First XDP Program: Packet Drop at Line Rate",
-    meta: "Apr 12, 2025 · eBPF · 8 min read",
-    body: `
-<h3>Background</h3>
-<p>XDP (eXpress Data Path) lets you attach a BPF program directly to a network driver's RX path — before the kernel's networking stack even sees the packet. This means you can drop, redirect, or modify packets at the absolute earliest point, achieving line-rate performance on a single core.</p>
-
-<h3>The Program</h3>
-<p>Here's the minimal XDP drop program:</p>
-<pre>SEC("xdp")
-int xdp_drop_all(struct xdp_md *ctx) {
-    return XDP_DROP;
-}</pre>
-<p>Load it with <code>ip link set dev eth0 xdp obj xdp_drop.o</code>. That's it — everything inbound on eth0 is dropped at the NIC driver level.</p>
-
-<h3>Adding a BPF Map for Dynamic Rules</h3>
-<p>The interesting part is making this dynamic. I used a <code>BPF_MAP_TYPE_LPM_TRIE</code> to store CIDR blocks to block, and a <code>BPF_MAP_TYPE_PERCPU_ARRAY</code> for per-CPU drop counters. The verifier ensures no unbounded loops, which forces you to think carefully about lookup depth.</p>
-
-<h3>Results</h3>
-<p>On a single Xeon core with a Mellanox ConnectX-5 NIC in native XDP mode, I measured <strong>14.2 Mpps</strong> drop throughput using <code>pktgen</code> as the sender. CPU utilization stayed under 40%. The same workload via iptables saturated the core at ~3 Mpps.</p>
-
-<h3>Gotchas</h3>
-<p>The BPF verifier is strict about pointer arithmetic — you must always bounds-check <code>data + offset</code> against <code>data_end</code> before dereferencing. Also, not all drivers support native XDP; some fall back to generic XDP which runs post-GRO and is much slower.</p>
-    `
-  },
-  blog2: {
-    title: "DPDK PMD Internals: How Poll Mode Drivers Kill Interrupt Overhead",
-    meta: "Mar 5, 2025 · DPDK · 10 min read",
-    body: `
-<h3>The Problem with Interrupts</h3>
-<p>Traditional NIC drivers use interrupts to signal that a packet has arrived. At 10 Gbps with 64-byte frames, that's ~14.8 million interrupts per second — enough to saturate a modern CPU just handling interrupt overhead, before a single byte of packet data is processed.</p>
-
-<h3>DPDK's Answer: Poll Mode Drivers</h3>
-<p>DPDK's PMD model dedicates a CPU core to continuously polling the NIC's RX descriptor ring. No interrupts, no context switches, no scheduler involvement. The core burns 100% CPU, but it can handle ~30 Mpps on a single core on modern NICs.</p>
-
-<h3>Memory Layout</h3>
-<p>DPDK allocates packet buffers from huge pages (1G or 2M) to avoid TLB misses. Mbufs (<code>rte_mbuf</code>) are pre-allocated in a mempool and passed through the ring zero-copy. The NIC DMA-writes directly into these pre-mapped buffers via the descriptor ring.</p>
-
-<pre>struct rte_mempool *mbuf_pool = rte_pktmbuf_pool_create(
-    "MBUF_POOL", NUM_MBUFS, MBUF_CACHE_SIZE,
-    0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
-
-nb_rx = rte_eth_rx_burst(port, 0, bufs, BURST_SIZE);</pre>
-
-<h3>RSS and Flow Director</h3>
-<p>To scale across multiple cores, DPDK uses Receive Side Scaling (RSS) to hash flows to queues, with each queue pinned to a dedicated core. Flow Director (FDIR) adds exact-match or signature-based steering on top of RSS for more control.</p>
-    `
-  },
-  blog3: {
-    title: "RDMA from Scratch: Queue Pairs, Completions, and Zero-Copy Transfers",
-    meta: "Feb 18, 2025 · RDMA · 12 min read",
-    body: `
-<h3>Why RDMA?</h3>
-<p>Remote Direct Memory Access lets one machine read or write another machine's memory without involving the remote CPU. For AI training, this means model parameters and gradients can move between GPUs across the network without any CPU memcpy or kernel involvement in the hot path.</p>
-
-<h3>The Verbs API</h3>
-<p>The libibverbs API is notoriously verbose, but the core primitives are:</p>
-<pre>struct ibv_pd *pd = ibv_alloc_pd(ctx);
-struct ibv_mr *mr = ibv_reg_mr(pd, buf, buf_size,
-    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
-struct ibv_qp *qp = ibv_create_qp(pd, &qp_init_attr);</pre>
-<p>The memory region registration pins the buffer in physical memory and gives the NIC an RKEY (remote key) that the remote side uses to authorize writes.</p>
-
-<h3>Queue Pair State Machine</h3>
-<p>A QP must be transitioned through: RESET → INIT → RTR (Ready To Receive) → RTS (Ready To Send) before it can be used. Each transition requires setting parameters like PSN (packet sequence number), path MTU, and the remote QP number exchanged out-of-band.</p>
-
-<h3>Benchmark Results</h3>
-<p>Using <code>ib_write_lat</code> on ConnectX-5 with RoCE v2:</p>
-<pre>Payload  |  Median Latency
----------|----------------
-8 bytes  |  1.6 μs
-64 bytes |  1.8 μs
-4K bytes |  2.3 μs
-64K bytes|  5.1 μs</pre>
-    `
-  },
-  blog4: {
-    title: "Why AI Clusters Need RoCE: NCCL, Congestion, and PFC Deadlocks",
-    meta: "Jan 22, 2025 · AI Infra · 7 min read",
-    body: `
-<h3>Distributed Training and the All-Reduce Problem</h3>
-<p>When training a large model across hundreds of GPUs, every iteration requires synchronizing gradients across all GPUs. NCCL (NVIDIA Collective Communications Library) implements ring-allreduce, tree-allreduce, and other topologies to minimize communication volume.</p>
-
-<h3>Why RDMA Over RoCE?</h3>
-<p>NCCL can use TCP sockets, but latency is terrible — even at 100 Gbps Ethernet. RoCE v2 brings RDMA semantics over standard Ethernet, cutting latency to ~2μs and offloading the transport protocol entirely to the NIC's ASIC.</p>
-
-<h3>PFC and the Deadlock Problem</h3>
-<p>RoCE is lossless — it relies on Priority Flow Control (PFC) to prevent drops. When a downstream switch buffer fills, it sends a PAUSE frame upstream. The problem: in a fat-tree or Clos fabric, PAUSE frames can propagate and create circular hold-and-wait conditions that deadlock the entire fabric.</p>
-<p>The fix is a combination of: ECN (Explicit Congestion Notification) for early backpressure via DCQCN, careful PFC priority assignment, and lossless path isolation using traffic class separation.</p>
-
-<h3>Practical Notes</h3>
-<p>When tuning RoCE clusters, always check: <code>rdma_rxe</code> vs hardware RoCE, ECN marking thresholds on switch ingress buffers, and NCCL environment variables like <code>NCCL_IB_GID_INDEX</code> and <code>NCCL_NET_GDR_LEVEL</code>.</p>
-    `
-  },
-  blog5: {
-    title: "SR-IOV Deep Dive: Virtual Functions and the VFIO Framework",
-    meta: "Dec 10, 2024 · Kernel · 9 min read",
-    body: `
-<h3>What SR-IOV Does</h3>
-<p>Single Root I/O Virtualization (SR-IOV) is a PCIe spec that lets one physical NIC (Physical Function / PF) expose dozens of lightweight Virtual Functions (VFs) — each looking like a separate NIC to the guest OS. VFs share the hardware but have isolated TX/RX queues, MAC addresses, and VLAN tags.</p>
-
-<h3>Creating VFs</h3>
-<pre># Enable 4 VFs on ens3f0
-echo 4 > /sys/class/net/ens3f0/device/sriov_numvfs
-
-# List VFs
-ip link show ens3f0</pre>
-<p>Each VF gets its own PCI address and can be assigned to a VM or container directly.</p>
-
-<h3>VFIO for Safe Passthrough</h3>
-<p>VFIO (Virtual Function I/O) is the kernel framework for passing VFs to VMs safely. It exposes the device to userspace or QEMU with IOMMU protection — the VM can DMA only into its own memory regions, enforced by the IOMMU/SMMU.</p>
-
-<pre>modprobe vfio-pci
-echo "8086 1520" > /sys/bus/pci/drivers/vfio-pci/new_id</pre>
-
-<h3>Performance vs OVS</h3>
-<p>SR-IOV passthrough eliminates the vSwitch entirely from the data path. Compared to OVS-DPDK (which already removes kernel overhead), SR-IOV VF passthrough reduces latency by another 5-15μs and increases throughput by 10-20% in our benchmarks, at the cost of losing live migration support.</p>
-    `
-  }
-};
-
-function openModal(id) {
-  const post = posts[id];
-  if (!post) return;
-  document.getElementById('modal-content').innerHTML =
-    `<h2>${post.title}</h2><div class="modal-meta">${post.meta}</div><div class="modal-body">${post.body}</div>`;
-  document.getElementById('modal-bg').classList.add('open');
-  document.body.style.overflow = 'hidden';
-}
-function closeAllModals() {
-  document.getElementById('modal-bg').classList.remove('open');
-  document.body.style.overflow = '';
-}
-function closeModal(e) {
-  if (e.target === document.getElementById('modal-bg')) closeAllModals();
-}
-
 // Fade-in on scroll
 const obs = new IntersectionObserver(entries => {
   entries.forEach((e, i) => {
