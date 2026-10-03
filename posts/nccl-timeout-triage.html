@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reading the crime scene: triaging an NCCL timeout — Naresh Kumar</title>
+<meta name="description" content="An interactive incident drill: every rank reports the same NCCL watchdog timeout. Use flight-recorder state, GPU Xid events and NIC counters to find the one rank or component that caused it.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/nccl-timeout-triage.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Reading the crime scene: triaging an NCCL timeout">
+<meta property="og:description" content="Every rank reports the same timeout. Use GPU, NIC and NCCL signals to find the one that caused it.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/nccl-timeout-triage.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .incidents { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .incidents .wbtn[aria-current="true"] { border-color: var(--accent); color: var(--accent); }
+  .brief { color: var(--text-mid); font-size: 0.92rem; margin-bottom: 1rem; }
+  .brief b { color: var(--text); }
+  .cluster { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; }
+  .node { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; }
+  .node-h { font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-dim); margin-bottom: 0.35rem; display: flex; justify-content: space-between; }
+  .ranks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+  .rk { font-family: var(--font-mono); font-size: 0.66rem; text-align: center; padding: 0.3rem 0; border-radius: 3px;
+        background: var(--bg3); color: var(--text-mid); border: 1px solid transparent; }
+  .rk.timeout { background: rgba(248, 113, 113, 0.14); color: var(--bad); }
+  .rk.behind { background: rgba(251, 191, 36, 0.18); color: var(--warn); border-color: var(--warn); }
+  .rk.missing { background: rgba(167, 139, 250, 0.18); color: var(--accent2); border-color: var(--accent2); }
+  .rk.hw { outline: 2px solid var(--bad); outline-offset: 1px; }
+  .evidence-btns { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0 0.5rem; }
+  .panels { display: grid; gap: 0.75rem; }
+  .panel { border: 1px solid var(--border); border-radius: 6px; background: #07090c; }
+  .panel h4 { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); }
+  .panel pre { font-family: var(--font-mono); font-size: 0.72rem; line-height: 1.55; color: var(--text-mid); padding: 0.7rem 0.8rem; overflow-x: auto; margin: 0; white-space: pre; }
+  .panel .hl { color: var(--warn); } .panel .bad { color: var(--bad); } .panel .dim { color: var(--text-dim); }
+  .verdict { margin-top: 1rem; display: grid; gap: 0.5rem; }
+  .choices { display: grid; gap: 0.4rem; }
+  .choice { display: flex; gap: 0.6rem; align-items: flex-start; font-size: 0.9rem; color: var(--text-mid); cursor: pointer;
+            border: 1px solid var(--border); border-radius: 6px; padding: 0.55rem 0.75rem; background: var(--bg); }
+  .choice:hover { border-color: var(--border-bright); }
+  .choice input { margin-top: 0.3rem; accent-color: var(--accent); }
+  .choice.right { border-color: var(--ok); color: var(--text); }
+  .choice.wrong { border-color: var(--bad); }
+  .result { display: none; }
+  .result.show { display: block; }
+  .score { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-dim); }
+  @media (max-width: 720px) { .cluster { grid-template-columns: 1fr 1fr; } }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Reading the crime scene: triaging an NCCL timeout","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-03"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip chip-accent">Reliability</span><span class="chip">▶ Interactive drill</span></div>
+    <h1>Reading the crime scene: triaging an NCCL timeout</h1>
+    <p class="post-dek">32 ranks, one stalled all-reduce, 32 identical error messages. Pull evidence one source at a time and name the culprit before you restart anything.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 6 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>The watchdog message is the <em>least</em> informative signal: it’s the same on every rank.</li>
+      <li>Per-rank collective state (from the flight recorder) tells you <b>where</b> the chain broke. GPU and NIC telemetry tells you <b>why</b>.</li>
+      <li>Different root causes need different actions: drain a node, replace a cable, fix application code. Restarting the whole job is the right answer to none of them.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>The setup</h2>
+    <p>A 4-node job, 8 GPUs per node, 32 ranks, data-parallel with NCCL. GPU <code>i</code> on every node uses NIC <code>mlx5_i</code> (a rail-optimized layout), and rank = <code>node × 8 + gpu</code>. Something went wrong mid-step. Ten minutes later, every rank’s watchdog fired.</p>
+    <p>Pick an incident, look at the cluster, and open evidence sources in whatever order you think is fastest. Fewer sources used is better: in a real outage every query costs minutes.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="w-title">
+    <div class="widget-head">
+      <span class="widget-title" id="w-title">Incident drill</span>
+      <span class="widget-hint score" id="score">0 of 4 sources used</span>
+    </div>
+    <div class="incidents" id="incidents" role="group" aria-label="Choose incident"></div>
+    <p class="brief" id="brief"></p>
+    <div class="cluster" id="cluster" aria-label="Cluster: 4 nodes × 8 ranks"></div>
+    <div class="legend">
+      <span><i style="background:var(--bad)"></i>watchdog timeout</span>
+      <span><i style="background:var(--warn)"></i>flight recorder: behind or stuck on network</span>
+      <span><i style="background:var(--accent2)"></i>never enqueued this op</span>
+    </div>
+
+    <div class="evidence-btns" id="ev-btns">
+      <button class="wbtn" data-ev="watchdog">📜 Watchdog logs</button>
+      <button class="wbtn" data-ev="fr">🧭 Flight recorder</button>
+      <button class="wbtn" data-ev="gpu">🟩 GPU: Xid / DCGM</button>
+      <button class="wbtn" data-ev="nic">🔌 NIC counters</button>
+    </div>
+    <div class="panels" id="panels" aria-live="polite"></div>
+
+    <div class="verdict">
+      <span class="widget-title">Your call</span>
+      <div class="choices" id="choices"></div>
+      <div class="btn-row"><button class="wbtn primary" id="submit">Submit diagnosis</button></div>
+      <div class="callout result" id="result" aria-live="polite"></div>
+    </div>
+  </figure>
+
+  <div class="prose">
+    <h2>The method, without the game</h2>
+    <ol>
+      <li><strong>Ignore the loudest symptom.</strong> Identical timeouts on every rank confirm that the collective stalled. They don’t say where.</li>
+      <li><strong>Find the break in collective state.</strong> Compare the last enqueued, started and completed sequence numbers across ranks. A rank that never <em>enqueued</em> the op points at the host or application side. A rank that’s <em>behind</em>, or a group of ranks sharing a rail, points at a device or the fabric.</li>
+      <li><strong>Correlate lower layers in the same time window.</strong> GPU Xid events and DCGM health for the suspect GPUs; NIC link-down, symbol-error, discard and pause counters for the suspect rails.</li>
+      <li><strong>Separate victims from causes.</strong> Back-pressure spreads, so the noisiest counters can sit on innocent ports (see <a href="pfc-deadlock.html">PFC</a>).</li>
+      <li><strong>Choose the smallest safe action</strong> for what you found, then resume.</li>
+    </ol>
+    <p>None of this is exotic, but done by hand it takes a person, many dashboards and a lot of minutes per incident. Automating it is the core of <a href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener">goodput</a>: capture flight-recorder signatures, join them with DCGM and NIC telemetry on a topology map, and output a culprit with its evidence. <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof</a> already does the NIC-counter half for slowdowns, and the <a href="https://huggingface.co/nareshns2004/NCCL-RCA" target="_blank" rel="noopener">NCCL-RCA</a> model on Hugging Face is my experiment in learning the log-reading half.</p>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Scenario notes</h2>
+    <ul>
+      <li>All four incidents are constructed for teaching. Log lines follow the shape of PyTorch’s <code>ProcessGroupNCCL</code> watchdog, its flight-recorder fields, <code>nvidia-smi</code>/kernel Xid messages and <code>ethtool -S</code>/RDMA counters, but they are not captured from a real cluster.</li>
+      <li>Xid meanings used: 79 = GPU has fallen off the bus; 48 = double-bit ECC error. Counter names are illustrative of the mlx5 family.</li>
+      <li>Real incidents are messier: several weak signals at once, missing telemetry, and clocks that disagree.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="checkpoint-interval.html"><div class="k">Next · interactive</div><div class="v">How often should a 16K-GPU job checkpoint?</div></a>
+      <a class="card" href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener"><div class="k">Repo</div><div class="v">goodput: fault attribution &amp; recovery ↗</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+(function () {
+  const SEQ = 18342;
+  const rk = (n, g) => n * 8 + g;
+  const wd = (r, ms) => `[rank${r}]:[E ProcessGroupNCCL.cpp] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=${SEQ}, OpType=ALLREDUCE, NumelIn=26214400, NumelOut=26214400, Timeout(ms)=600000) ran for ${ms} milliseconds before timing out.`;
+  const watchdogLog = (first, skip = []) => {
+    const order = [first, 5, 30, 12, 0, 27, 19, 8].filter((r, i, a) => a.indexOf(r) === i && !skip.includes(r));
+    return order.map((r, i) => wd(r, 600014 + i * 37)).join('\n') + `\n<span class="dim">… ${32 - order.length - skip.length} more ranks, identical except rank number</span>`;
+  };
+  const frRow = (r, enq, st, comp, note = '') =>
+    `rank${String(r).padEnd(3)}  last_enqueued=${enq}  last_started=${st}  last_completed=${comp}${note}`;
+
+  const INCIDENTS = [
+    {
+      name: 'Incident 1', brief: '<b>03:12 UTC.</b> Loss curve stopped updating. Job stalled in the gradient all-reduce. On-call’s first guess: “rank 27 reported first, drain node 3.”',
+      states: { behind: [], missing: [], hw: [rk(2, 5)] }, behindFn: r => r === rk(2, 5),
+      ev: {
+        watchdog: () => watchdogLog(27, [rk(2, 5)]) + `\n<span class="hl">rank21: no watchdog line</span>`,
+        fr: () => [frRow(0, SEQ, SEQ, SEQ - 1), frRow(1, SEQ, SEQ, SEQ - 1), '…', frRow(20, SEQ, SEQ, SEQ - 1),
+          `<span class="hl">${frRow(21, SEQ - 1, SEQ - 1, SEQ - 2, '   ← dump incomplete; process unresponsive')}</span>`, frRow(22, SEQ, SEQ, SEQ - 1), '…', frRow(31, SEQ, SEQ, SEQ - 1)].join('\n'),
+        gpu: () => `<span class="dim">node2 dmesg:</span>\n<span class="bad">NVRM: Xid (PCI:0000:9a:00): 79, pid=48812, GPU has fallen off the bus.</span>\n<span class="dim">node2 dcgmi health -c:</span>\n  GPU 5: <span class="bad">Fail</span> (PCIe: GPU not reachable)\n  GPU 0-4,6-7: Healthy\n<span class="dim">nodes 0,1,3:</span> no Xid events in window`,
+        nic: () => `<span class="dim">all nodes, all ports (Δ over 15 min):</span>\n  link_downed=0  symbol_error=0  rx_discards_phy≈0\n  <span class="dim">tx/rx bytes flat since 03:12 on every port (job idle)</span>`,
+      },
+      choices: ['Node 3: rank 27 reported the timeout first', 'Node 2 GPU 5 (rank 21): hardware failure', 'NIC mlx5_5 rail: fabric problem on rail 5', 'Application bug: ranks issued mismatched collectives'],
+      answer: 1,
+      explain: '<b>Node 2, GPU 5.</b> Xid 79 means the GPU dropped off PCIe, which is why rank 21 can’t even write its flight-recorder dump or watchdog line. Rank 27 was just the first timer to expire. <b>Action:</b> cordon node 2 for hardware triage, replace it with a spare, and resume. Restarting on the same node would hit the same GPU.',
+    },
+    {
+      name: 'Incident 2', brief: '<b>11:47 UTC.</b> Step time crept up for ~20 minutes, then the job stalled. No GPU alerts fired.',
+      states: { behind: [rk(1, 3)], missing: [] }, behindFn: r => [3, 11, 19, 27].includes(r),
+      ev: {
+        watchdog: () => watchdogLog(4),
+        fr: () => [frRow(0, SEQ, SEQ, SEQ - 1), '…',
+          `<span class="hl">${frRow(3, SEQ, SEQ, SEQ - 1, '   rail 3: started, no progress on net channel')}</span>`,
+          `<span class="hl">${frRow(11, SEQ, SEQ, SEQ - 1, '   rail 3')}</span>`, `<span class="hl">${frRow(19, SEQ, SEQ, SEQ - 1, '   rail 3')}</span>`, `<span class="hl">${frRow(27, SEQ, SEQ, SEQ - 1, '   rail 3')}</span>`,
+          '<span class="dim">other ranks: started, blocked on intra-node NVLink stages waiting for rail-3 peers</span>'].join('\n'),
+        gpu: () => `<span class="dim">all nodes:</span> no Xid events in window\n<span class="dim">dcgmi health:</span> all 32 GPUs Healthy\n<span class="dim">DCGM_FI_DEV_GPU_UTIL:</span> dropped to ~0 at 12:07 on every GPU (idle, waiting)`,
+        nic: () => `<span class="dim">Δ over 30 min, per port:</span>\n  node0 mlx5_3  link_downed=0   symbol_error=0\n  <span class="bad">node1 mlx5_3  link_downed=14  symbol_error=48210  local_ack_timeout_err=391</span>\n  node2 mlx5_3  link_downed=0   symbol_error=0    <span class="dim">(retries rising: peer of node1)</span>\n  node3 mlx5_3  link_downed=0   symbol_error=0\n  <span class="dim">all other ports: clean</span>`,
+      },
+      choices: ['GPU 3 on every node: driver bug on that GPU index', 'Node 1 NIC mlx5_3 / its cable or switch port: flapping link', 'Node 2 mlx5_3: it shows rising retries', 'Fabric-wide congestion: tune DCQCN'],
+      answer: 1,
+      explain: '<b>Node 1, mlx5_3, physical link.</b> Rising symbol errors and repeated link-downs on one port are the classic signs of a bad cable, transceiver or switch port, and the slow step-time creep beforehand was retransmissions. The whole rail stalls because rail-3 peers talk across it. Node 2’s retries are a <em>victim</em> effect. <b>Action:</b> drain node 1 (or shift its traffic off the rail), file a cable/optic ticket, and resume. The GPUs are fine.',
+    },
+    {
+      name: 'Incident 3', brief: '<b>19:05 UTC.</b> Job stalled right after an evaluation step that only some ranks run.',
+      states: { behind: [], missing: [rk(1, 1)] }, behindFn: () => false,
+      ev: {
+        watchdog: () => watchdogLog(14, [rk(1, 1)]) + `\n<span class="hl">rank9: no watchdog line (no outstanding NCCL work)</span>`,
+        fr: () => [frRow(0, SEQ, SEQ, SEQ - 1), '…', frRow(8, SEQ, SEQ, SEQ - 1),
+          `<span class="hl">${frRow(9, SEQ - 1, SEQ - 1, SEQ - 1, '   ← never enqueued SeqNum ' + SEQ)}</span>`, frRow(10, SEQ, SEQ, SEQ - 1), '…',
+          '<span class="dim">rank9 py-spy: MainThread in eval_hook() → dataloader.__next__() → queue.get() (blocked)</span>'].join('\n'),
+        gpu: () => `<span class="dim">all nodes:</span> no Xid events, all GPUs Healthy\n<span class="dim">node1 GPU 1 util:</span> 0% since 19:05 (others: 0% since 19:05 too: waiting)`,
+        nic: () => `<span class="dim">all ports:</span> link_downed=0 symbol_error=0 discards≈0\n<span class="dim">traffic flat since 19:05 everywhere</span>`,
+      },
+      choices: ['Node 1 GPU 1: hardware hang', 'Fabric: rail 1 is down', 'Rank 9 application: blocked in Python, never called the all-reduce', 'NCCL bug: all ranks deadlocked internally'],
+      answer: 2,
+      explain: '<b>Rank 9, application side.</b> Every other rank enqueued SeqNum 18342; rank 9 never did, because its main thread is blocked in an eval-only dataloader. Hardware and fabric are clean. <b>Action:</b> no node to drain. Fix the code path (eval on all ranks, or no collectives inside rank-conditional code) and add a desync check. Restarting would reproduce it at the next eval.',
+    },
+    {
+      name: 'Incident 4', brief: '<b>07:30 UTC.</b> Throughput degraded for an hour, then a timeout. The network dashboard’s top alert: “node 3: PFC pause storm on all ports.”',
+      states: { behind: [rk(0, 6)], missing: [] }, behindFn: r => r === rk(0, 6),
+      ev: {
+        watchdog: () => watchdogLog(30),
+        fr: () => [frRow(0, SEQ, SEQ, SEQ - 1), '…', `<span class="hl">${frRow(6, SEQ, SEQ, SEQ - 2, '   ← one op behind; recv from net slow')}</span>`, frRow(7, SEQ, SEQ, SEQ - 1), '…', frRow(31, SEQ, SEQ, SEQ - 1)].join('\n'),
+        gpu: () => `<span class="dim">all GPUs:</span> no Xid, Healthy\n<span class="dim">node0 nvidia-smi -q (GPU 6):</span> PCIe gen 5 x16, replay counter 0`,
+        nic: () => `<span class="dim">Δ over 60 min:</span>\n  <span class="hl">node3 mlx5_0..7  tx_pause_duration high on all ports</span>   <span class="dim">(top of dashboard)</span>\n  node0 mlx5_6     <span class="bad">rx_discards_phy=2.1M  rx_pause_sent high  out_of_buffer=870k</span>\n  <span class="dim">node0 lspci -vv mlx5_6:</span> <span class="bad">LnkSta: Speed 32GT/s, Width x4 (downgraded)  LnkCap: x16</span>\n  <span class="dim">other node0 ports:</span> clean`,
+      },
+      choices: ['Node 3: it is generating the pause storm', 'Node 0 NIC mlx5_6: PCIe link trained at x4, so the host can’t absorb receive traffic', 'Switch buffers too small: raise XOFF everywhere', 'Node 0 GPU 6: slow GPU'],
+      answer: 1,
+      explain: '<b>Node 0, mlx5_6, degraded PCIe link.</b> The NIC trained at x4 instead of x16, so it can’t move received data into host or GPU memory fast enough. It drops and sends pauses, and back-pressure spreads through the fabric. Node 3’s ports are loud <em>victims</em> of that propagation. <b>Action:</b> drain node 0, reseat or replace the NIC or riser, and add a PCIe width check to node burn-in. This is exactly the victim-vs-origin problem <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof</a> is built to untangle.',
+    },
+  ];
+
+  let cur = 0, used = new Set(), submitted = false;
+
+  function renderCluster(showFR) {
+    const inc = INCIDENTS[cur], c = P.$('#cluster');
+    c.innerHTML = '';
+    for (let n = 0; n < 4; n++) {
+      const node = document.createElement('div'); node.className = 'node';
+      node.innerHTML = `<div class="node-h"><span>node${n}</span><span>mlx5_0–7</span></div><div class="ranks"></div>`;
+      const ranks = node.querySelector('.ranks');
+      for (let g = 0; g < 8; g++) {
+        const r = rk(n, g), el = document.createElement('div');
+        let cls = 'rk timeout';
+        if (showFR && inc.states.missing.includes(r)) cls = 'rk missing';
+        else if (showFR && inc.behindFn(r)) cls = 'rk behind';
+        if (used.has('gpu') && (inc.states.hw || []).includes(r)) cls += ' hw';
+        el.className = cls; el.textContent = r; el.title = `rank ${r} · node${n} GPU${g} · mlx5_${g}`;
+        ranks.appendChild(el);
+      }
+      c.appendChild(node);
+    }
+  }
+
+  const LABELS = { watchdog: 'Watchdog logs (aggregated)', fr: 'Flight recorder: per-rank collective state', gpu: 'GPU: Xid events & DCGM health', nic: 'NIC counters & link state' };
+  function renderPanels() {
+    const inc = INCIDENTS[cur];
+    P.$('#panels').innerHTML = [...used].map(k => `<div class="panel"><h4>${LABELS[k]}</h4><pre>${inc.ev[k]()}</pre></div>`).join('');
+    P.$('#score').textContent = `${used.size} of 4 sources used`;
+    P.$$('#ev-btns .wbtn').forEach(b => b.setAttribute('aria-pressed', String(used.has(b.dataset.ev))));
+    renderCluster(used.has('fr'));
+  }
+
+  function load(i) {
+    cur = i; used = new Set(); submitted = false;
+    const inc = INCIDENTS[i];
+    P.$$('#incidents .wbtn').forEach((b, j) => b.setAttribute('aria-current', String(j === i)));
+    P.$('#brief').innerHTML = inc.brief;
+    P.$('#choices').innerHTML = inc.choices.map((c, j) =>
+      `<label class="choice"><input type="radio" name="dx" value="${j}"><span>${c}</span></label>`).join('');
+    const res = P.$('#result'); res.className = 'callout result'; res.innerHTML = '';
+    renderPanels();
+  }
+
+  P.$('#incidents').innerHTML = INCIDENTS.map((inc, i) => `<button class="wbtn" data-i="${i}">${inc.name}</button>`).join('');
+  P.$('#incidents').addEventListener('click', e => { if (e.target.dataset.i) load(+e.target.dataset.i); });
+  P.$('#ev-btns').addEventListener('click', e => {
+    const k = e.target.closest('button')?.dataset.ev; if (!k) return;
+    used.add(k); renderPanels();
+  });
+  P.$('#submit').addEventListener('click', () => {
+    const pick = document.querySelector('input[name="dx"]:checked');
+    const res = P.$('#result');
+    if (!pick) { res.className = 'callout result show'; res.innerHTML = 'Pick a diagnosis first.'; return; }
+    const inc = INCIDENTS[cur], ok = +pick.value === inc.answer;
+    P.$$('.choice').forEach((el, j) => el.classList.toggle('right', j === inc.answer));
+    pick.closest('.choice').classList.toggle('wrong', !ok);
+    res.className = 'callout result show';
+    res.innerHTML = `${ok ? '✅ Correct' : '❌ Not quite'} · ${used.size} of 4 sources used.<br>${inc.explain}` +
+      (cur < INCIDENTS.length - 1 ? `<div class="btn-row"><button class="wbtn" id="next">Next incident →</button></div>` : '<p style="margin-top:.6rem">That’s all four. Every one ended in a timeout on all ranks, and each needed a different action.</p>');
+    const nx = P.$('#next'); if (nx) nx.addEventListener('click', () => load(cur + 1));
+  });
+  load(0);
+})();
+</script>
+</body>
+</html>

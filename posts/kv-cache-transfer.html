@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The KV-cache bill: what disaggregated inference has to move — Naresh Kumar</title>
+<meta name="description" content="Interactive calculator: how many bytes of KV cache prefill hands to decode in disaggregated LLM inference, how long that takes on real links, and when layer-wise pipelining hides it.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/kv-cache-transfer.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The KV-cache bill: what disaggregated inference has to move">
+<meta property="og:description" content="Size the KV transfer between prefill and decode GPUs for real model configs and link speeds.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/kv-cache-transfer.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .widget .tldr-accent { color: var(--accent2); }
+  .tl-label { fill: var(--text-mid); font-size: 11px; }
+  .tl-val { fill: var(--text); font-size: 11px; font-weight: 700; }
+  .tl-axis { stroke: var(--border-bright); }
+  .tl-prefill { fill: var(--accent); }
+  .tl-xfer { fill: var(--accent2); }
+  .tl-exposed { fill: var(--bad); }
+  .tl-layer { stroke: #0a0c10; stroke-width: 0.6; }
+  .kv-table td.num, .kv-table th.num { text-align: right; font-family: var(--font-mono); }
+  .kv-table tr.sel td { color: var(--accent2); }
+  .bar-cell { width: 35%; }
+  .bar { height: 8px; border-radius: 2px; background: var(--accent2); opacity: 0.8; }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"The KV-cache bill: what disaggregated inference has to move","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-03"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip chip-accent">Efficiency</span><span class="chip">▶ Interactive</span></div>
+    <h1>The KV-cache bill: what disaggregated inference has to move</h1>
+    <p class="post-dek">Splitting prefill and decode onto separate GPUs removes their interference, and creates a transfer. How many bytes is that, how long does it take, and when can you hide it?</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 7 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>KV cache per token = <code>2 · layers · kv_heads · head_dim · bytes</code>. Grouped-query attention made it several times smaller, but at 8K tokens a 70B model still hands off gigabytes.</li>
+      <li>Transfer time and prefill compute both grow with prompt length, so their <em>ratio</em> is mostly a property of the model, the GPU and the link.</li>
+      <li>Sending layer <code>i</code> while computing layer <code>i+1</code> hides most of the transfer whenever the link keeps up with compute. When it doesn’t, the gap lands directly on time-to-first-token.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>Why disaggregate at all?</h2>
+    <p>LLM inference has two phases with opposite profiles. <strong>Prefill</strong> processes the whole prompt in one pass, is compute-bound, and arrives in bursts. <strong>Decode</strong> generates one token per step, is bound by memory bandwidth, and is sensitive to latency. On the same GPUs, a large prefill stalls every in-flight decode (TPOT spikes), and a full decode batch delays new prefills (TTFT spikes). Chunked prefill reduces the interference but doesn’t remove it.</p>
+    <p>Disaggregated serving (DistServe, Splitwise and Mooncake are well-known designs) runs the phases on separate GPU pools, so each pool can be batched and scaled for its own bottleneck. The cost is that the KV cache prefill produces must reach a decode GPU before the first token can be generated.</p>
+
+    <h2>How big is the KV cache?</h2>
+    <p>Each transformer layer stores one key and one value vector per KV head per token:</p>
+    <div class="formula">KV bytes / token = 2 × layers × kv_heads × head_dim × bytes_per_element</div>
+    <p>Here are the numbers for public model configs at 16-bit precision. Notice what grouped-query attention (GQA) did: Llama 2 7B uses one KV head per query head, while Llama 3.1 8B shares 8 KV heads across 32 query heads.</p>
+  </div>
+
+  <div class="prose">
+    <table class="kv-table" id="kv-table">
+      <thead><tr><th>Model</th><th class="num">Layers × KV heads × dim</th><th class="num">KV / token</th><th class="num">8K-token prompt</th><th class="bar-cell"></th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <figure class="widget" aria-labelledby="w-title">
+    <div class="widget-head">
+      <span class="widget-title" id="w-title">KV handoff calculator</span>
+      <span class="widget-hint">All sliders are assumptions. Move them.</span>
+    </div>
+    <div class="controls">
+      <div class="control"><label for="m">Model</label><select id="m"></select></div>
+      <div class="control"><label for="dt">KV dtype</label>
+        <select id="dt"><option value="2" selected>BF16 / FP16 (2 B)</option><option value="1">FP8 (1 B)</option></select></div>
+      <div class="control"><label for="tok">Prompt tokens <output for="tok"></output></label><input type="range" id="tok" min="7" max="17" step="1" value="13"></div>
+      <div class="control"><label for="tp">Tensor parallel (prefill) <output for="tp"></output></label><input type="range" id="tp" min="0" max="3" step="1" value="3"></div>
+      <div class="control"><label for="gpu">Prefill GPU (dense BF16 peak)</label>
+        <select id="gpu"><option value="312">A100 · 312 TFLOPS</option><option value="989" selected>H100 SXM · 989 TFLOPS</option></select></div>
+      <div class="control"><label for="mfu">Prefill MFU <output for="mfu"></output></label><input type="range" id="mfu" min="10" max="70" step="5" value="40"></div>
+      <div class="control"><label for="link">NIC per GPU</label>
+        <select id="link"><option value="100">100 Gb/s</option><option value="200">200 Gb/s</option><option value="400" selected>400 Gb/s</option><option value="800">800 Gb/s</option></select></div>
+      <div class="control"><label for="eff">Achieved link efficiency <output for="eff"></output></label><input type="range" id="eff" min="30" max="95" step="5" value="80"></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="stat-label">KV to move</div><div class="stat-value" id="o-kv">–</div><div class="stat-sub" id="o-kvgpu"></div></div>
+      <div class="stat"><div class="stat-label">Prefill compute</div><div class="stat-value" id="o-pre">–</div><div class="stat-sub" id="o-flops"></div></div>
+      <div class="stat"><div class="stat-label">Transfer (sequential)</div><div class="stat-value" id="o-xfer">–</div><div class="stat-sub" id="o-ratio"></div></div>
+      <div class="stat"><div class="stat-label">Exposed if layer-pipelined</div><div class="stat-value" id="o-exp">–</div><div class="stat-sub">added to TTFT</div></div>
+    </div>
+
+    <svg id="tl" viewBox="0 0 760 150" role="img" aria-label="Timeline comparing sequential and layer-pipelined KV transfer"></svg>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>prefill compute</span>
+      <span><i style="background:var(--accent2)"></i>KV transfer</span>
+      <span><i style="background:var(--bad)"></i>exposed (adds to TTFT)</span>
+    </div>
+    <p class="callout" id="insight"></p>
+  </figure>
+
+  <div class="prose">
+    <h2>Three things the calculator shows</h2>
+    <h3>1. The ratio barely moves with prompt length</h3>
+    <p>Drag the prompt length from 128 to 128K tokens. Both the bytes and the dense FLOPs (<code>≈ 2 · params · tokens</code>) scale linearly, so the transfer-to-compute ratio stays roughly flat until attention’s quadratic term takes over at long contexts, and then compute grows faster than bytes. The ratio is set mostly by <strong>KV bytes per parameter</strong>, the GPU’s achieved FLOPs and the link.</p>
+
+    <h3>2. Tensor parallelism helps the network as well as compute</h3>
+    <p>With TP=8, the KV cache is already sharded across 8 GPUs, and each GPU can send its shard over its own NIC. Aggregate bandwidth scales with TP, which is why rail-optimized fabrics (GPU <code>i</code> of every node on the same leaf) matter for KV transfer and not only for training collectives.</p>
+
+    <h3>3. Pipelining hides the transfer, until the link falls behind</h3>
+    <p>Layer <code>i</code>’s KV is final as soon as layer <code>i</code> finishes, so a transport can send it while layer <code>i+1</code> computes. When per-layer transfer time is below per-layer compute time, only the last layer’s transfer is exposed. When it isn’t, the backlog grows layer by layer and adds straight to TTFT. Try <strong>Llama 2 7B (MHA)</strong> on a 100 Gb/s NIC: it becomes link-bound. Then switch to Llama 3.1 8B (same size, GQA) or to FP8 KV, and the exposure shrinks to almost nothing. Large GQA models like the 70B keep up comfortably, because they do far more compute per KV byte.</p>
+
+    <h2>What the calculator leaves out</h2>
+    <p>The arithmetic is the easy part. These are the parts I’m building <a href="https://github.com/nareshns2004/disaggregated-inference-engine" target="_blank" rel="noopener">kvwire</a> to measure:</p>
+    <ul>
+      <li><strong>Layout mismatch.</strong> Paged KV caches scatter a sequence across many small blocks. Moving thousands of small blocks means many small RDMA writes that never reach link efficiency, unless the transport gathers them or a kernel re-lays them out first.</li>
+      <li><strong>Different parallelism on each side.</strong> Prefill at TP=8 handing off to decode at TP=2 means re-sharding in flight.</li>
+      <li><strong>Failure mid-transfer.</strong> A link flap halfway through a 2 GiB handoff must not leave decode generating from a half-written cache. The transport needs completion semantics and the coordinator needs a retry or recompute policy.</li>
+      <li><strong>Congestion.</strong> KV bursts share a fabric with everything else, and on lossless RoCE that brings <a href="pfc-deadlock.html">PFC behaviour</a> into the picture.</li>
+    </ul>
+    <p>Every number kvwire publishes will sit next to the measured hardware ceiling and link to its run. Until then, this page is the model it will be checked against.</p>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>Model shapes come from the public configs (layers, KV heads, head dim, hidden size, parameter count).</li>
+      <li>Prefill FLOPs ≈ <code>2·params·T + 2·layers·T²·hidden</code> (dense matmuls plus causal attention), divided by <code>TP × peak × MFU</code>. MFU is your assumption; real prefill efficiency depends on the kernels, batch and sequence length.</li>
+      <li>Transfer = total KV / (TP × NIC × efficiency). It assumes each TP rank sends its shard on its own NIC, with no contention and no re-sharding.</li>
+      <li>Layer-pipelined exposure = the backlog left when the last layer finishes, plus that layer’s send. It ignores per-message overheads, which is exactly what makes small paged blocks expensive in practice.</li>
+      <li>GPU peaks are dense BF16 spec-sheet figures (A100 312 TFLOPS, H100 SXM 989 TFLOPS).</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="pfc-deadlock.html"><div class="k">Next · interactive</div><div class="v">PFC: the lossless network that can freeze itself</div></a>
+      <a class="card" href="https://github.com/nareshns2004/disaggregated-inference-engine" target="_blank" rel="noopener"><div class="k">Repo</div><div class="v">kvwire: RDMA KV-cache transport ↗</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+(function () {
+  // Public model configs: layers, KV heads, head dim, hidden size, parameters.
+  const MODELS = [
+    { name: 'Llama 2 7B (MHA)', L: 32, kv: 32, d: 128, h: 4096, p: 6.74e9 },
+    { name: 'Mistral 7B', L: 32, kv: 8, d: 128, h: 4096, p: 7.24e9 },
+    { name: 'Llama 3.1 8B', L: 32, kv: 8, d: 128, h: 4096, p: 8.03e9 },
+    { name: 'Llama 3.1 70B', L: 80, kv: 8, d: 128, h: 8192, p: 70.6e9, def: true },
+    { name: 'Qwen2.5 72B', L: 80, kv: 8, d: 128, h: 8192, p: 72.7e9 },
+    { name: 'Llama 3.1 405B', L: 126, kv: 8, d: 128, h: 16384, p: 405e9 },
+  ];
+  const sel = P.$('#m');
+  MODELS.forEach((m, i) => sel.add(new Option(m.name, i, m.def, m.def)));
+  const perTok = (m, b) => 2 * m.L * m.kv * m.d * b;
+
+  // Static comparison table (BF16, 8K tokens)
+  const maxPT = Math.max(...MODELS.map(m => perTok(m, 2)));
+  const tbody = P.$('#kv-table tbody');
+  function table() {
+    tbody.innerHTML = MODELS.map((m, i) => `<tr class="${i == sel.value ? 'sel' : ''}">
+      <td>${m.name}</td><td class="num">${m.L} × ${m.kv} × ${m.d}</td>
+      <td class="num">${P.bytes(perTok(m, 2))}</td><td class="num">${P.bytes(perTok(m, 2) * 8192)}</td>
+      <td class="bar-cell"><div class="bar" style="width:${(100 * perTok(m, 2) / maxPT).toFixed(0)}%"></div></td></tr>`).join('');
+  }
+
+  const tl = P.$('#tl');
+  function timeline(pre, xfer, exposed, L) {
+    tl.innerHTML = '';
+    const X0 = 130, W = 520, total = Math.max(pre + xfer, 1e-9);
+    const sx = t => X0 + (t / total) * W;
+    const row = (y, label) => P.svg('text', { x: 0, y: y + 15, class: 'tl-label' }, tl).textContent = label;
+
+    // Row 1: sequential
+    row(18, 'sequential');
+    P.svg('rect', { x: sx(0), y: 18, width: sx(pre) - X0, height: 22, rx: 2, class: 'tl-prefill' }, tl);
+    P.svg('rect', { x: sx(pre), y: 18, width: Math.max(1, sx(pre + xfer) - sx(pre)), height: 22, rx: 2, class: 'tl-xfer' }, tl);
+    P.svg('text', { x: sx(pre + xfer) + 6, y: 33, class: 'tl-val' }, tl).textContent = `+${P.seconds(xfer)}`;
+
+    // Row 2: layer pipelined (draw per-layer chunks, up to 40 for legibility)
+    row(68, 'layer-pipelined');
+    const n = Math.min(L, 40), pc = pre / n, xc = xfer / n;
+    let sendEnd = 0;
+    for (let i = 0; i < n; i++) {
+      P.svg('rect', { x: sx(i * pc), y: 68, width: Math.max(0.5, sx(pc) - X0), height: 10, class: 'tl-prefill tl-layer' }, tl);
+      const start = Math.max((i + 1) * pc, sendEnd);
+      sendEnd = start + xc;
+      P.svg('rect', { x: sx(start), y: 80, width: Math.max(0.5, sx(xc) - X0), height: 10, class: 'tl-xfer tl-layer' }, tl);
+    }
+    if (exposed > 0) P.svg('rect', { x: sx(pre), y: 94, width: Math.max(1, sx(pre + exposed) - sx(pre)), height: 4, class: 'tl-exposed' }, tl);
+    P.svg('text', { x: sx(pre + exposed) + 6, y: 88, class: 'tl-val' }, tl).textContent = `+${P.seconds(exposed)}`;
+
+    // axis
+    P.svg('line', { x1: X0, y1: 112, x2: X0 + W, y2: 112, class: 'tl-axis' }, tl);
+    P.svg('line', { x1: sx(pre), y1: 10, x2: sx(pre), y2: 116, stroke: 'var(--text-dim)', 'stroke-dasharray': '3 3' }, tl);
+    P.svg('text', { x: sx(pre), y: 132, class: 'tl-label', 'text-anchor': sx(pre) > 560 ? 'end' : 'middle' }, tl).textContent = `prefill done · ${P.seconds(pre)}`;
+    P.svg('text', { x: X0, y: 132, class: 'tl-label' }, tl).textContent = '0';
+  }
+
+  function update() {
+    const m = MODELS[sel.value], b = +P.$('#dt').value;
+    const T = 2 ** +P.$('#tok').value, TP = 2 ** +P.$('#tp').value;
+    const peak = +P.$('#gpu').value * 1e12, mfu = +P.$('#mfu').value / 100;
+    const link = +P.$('#link').value * 1e9 / 8, eff = +P.$('#eff').value / 100;
+
+    const kv = perTok(m, b) * T;
+    const flops = 2 * m.p * T + 2 * m.L * T * T * m.h;
+    const pre = flops / (TP * peak * mfu);
+    const xfer = kv / (TP * link * eff);
+    // layer-pipelined: backlog after last layer + last layer send
+    const pc = pre / m.L, xc = xfer / m.L;
+    const exposed = Math.max(xc, xfer + pc - pre);
+
+    P.$('#o-kv').textContent = P.bytes(kv);
+    P.$('#o-kvgpu').textContent = `${P.bytes(perTok(m, b))}/token · ${P.bytes(kv / TP)} per GPU`;
+    P.$('#o-pre').textContent = P.seconds(pre);
+    P.$('#o-flops').textContent = `${(flops / 1e15).toFixed(flops < 1e15 ? 2 : 1)} PFLOP on ${TP} GPU${TP > 1 ? 's' : ''}`;
+    P.$('#o-xfer').textContent = P.seconds(xfer);
+    P.$('#o-ratio').textContent = `${(100 * xfer / pre).toFixed(0)}% of prefill time`;
+    const ex = P.$('#o-exp');
+    ex.textContent = P.seconds(exposed);
+    ex.className = 'stat-value ' + (exposed < 0.05 * pre ? 'good' : exposed < 0.25 * pre ? 'warn' : 'bad');
+
+    const keeps = xc <= pc;
+    P.$('#insight').innerHTML = keeps
+      ? `<b>The link keeps up.</b> Per layer, sending (${P.seconds(xc)}) is faster than computing (${P.seconds(pc)}), so pipelining hides all but the last layer. This regime is bounded by per-message overhead and layout, not raw bandwidth.`
+      : `<b>The link is the bottleneck.</b> Each layer takes ${P.seconds(xc)} to send but only ${P.seconds(pc)} to compute, so a backlog builds and ${P.seconds(exposed)} lands on TTFT. Options: FP8 KV, more NICs (higher TP), a faster rail, or keeping short prompts colocated.`;
+
+    timeline(pre, xfer, exposed, m.L);
+    table();
+  }
+
+  P.bind('tok', v => (2 ** v).toLocaleString(), update);
+  P.bind('tp', v => 2 ** v, update);
+  P.bind('mfu', v => `${v}%`, update);
+  P.bind('eff', v => `${v}%`, update);
+  ['m', 'dt', 'gpu', 'link'].forEach(id => P.$('#' + id).addEventListener('input', update));
+  update();
+})();
+</script>
+</body>
+</html>

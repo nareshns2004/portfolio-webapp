@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How often should a 16K-GPU job checkpoint? — Naresh Kumar</title>
+<meta name="description" content="Interactive Young/Daly checkpoint-interval calculator: cluster size, failure rate, checkpoint cost and restart cost, plotted as training goodput, with a sensitivity view of which lever matters most.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/checkpoint-interval.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How often should a 16K-GPU job checkpoint?">
+<meta property="og:description" content="Young/Daly with sliders, plotted as goodput. Which lever matters: checkpoint cost, restart cost, or failure rate?">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/checkpoint-interval.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .ax { stroke: var(--border-bright); }
+  .grid { stroke: var(--border); }
+  .ax-t { fill: var(--text-dim); font-size: 10px; }
+  .curve { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+  .curve.alt { stroke: var(--accent2); stroke-dasharray: 5 4; stroke-width: 2; }
+  .opt { fill: var(--ok); }
+  .opt-t { fill: var(--ok); font-size: 11px; font-weight: 700; }
+  .mine { stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 3 3; }
+  .mine-t { fill: var(--warn); font-size: 11px; }
+  .sens td.num { text-align: right; font-family: var(--font-mono); }
+  .sens td.up { color: var(--ok); }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"How often should a 16K-GPU job checkpoint?","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-03"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip chip-accent">Reliability</span><span class="chip">▶ Interactive</span></div>
+    <h1>How often should a 16K-GPU job checkpoint?</h1>
+    <p class="post-dek">Checkpoint too often and you pay for writes. Too rarely and every failure throws away hours. A 1974 formula gives the sweet spot, and it also shows which engineering lever is worth the most.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 6 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>Job-level MTBF shrinks linearly with GPU count. Reliable parts still add up to a failure every few hours at 16K GPUs.</li>
+      <li>Young’s approximation: optimal interval <code>τ ≈ √(2·δ·M)</code>, where <code>δ</code> is checkpoint cost and <code>M</code> is job MTBF.</li>
+      <li>With slow, blocking checkpoints, making them cheap is the first win. Once they’re cheap (async or in-memory), <b>restart cost</b> becomes the biggest term, and fast attribution plus a small blast radius is what shrinks it.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>Failures scale with the job</h2>
+    <p>If each GPU (with its share of host, NIC, cables and switch ports) fails independently with mean time between failures <code>m</code>, a job spanning <code>N</code> of them is interrupted every <code>M = m / N</code> on average. Any one failure stops a synchronous training job.</p>
+    <p>For a real reference point, Meta’s <a href="https://arxiv.org/abs/2407.21783" target="_blank" rel="noopener">Llama 3 paper</a> reports 419 unexpected interruptions over a 54-day snapshot of pretraining on 16,384 H100s, most attributed to hardware. That is one interruption roughly every 3 hours, which works out to an effective per-GPU MTBF of about 5.8 years. The calculator’s default preset uses that rate.</p>
+
+    <h2>The trade-off</h2>
+    <p>Each checkpoint costs <code>δ</code> of stalled training. Each failure costs a restart <code>R</code> (detect, reschedule, init, load) plus, on average, half an interval of lost work. Per unit time the waste is roughly:</p>
+    <div class="formula">waste(τ) ≈ δ/τ  +  (τ/2 + R) / M        →  τ* ≈ √(2·δ·M)</div>
+    <p>This is Young’s first-order result; Daly refined it for cases where <code>τ</code> isn’t small relative to <code>M</code>. Goodput is <code>1 − waste</code>.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="w-title">
+    <div class="widget-head">
+      <span class="widget-title" id="w-title">Goodput vs checkpoint interval</span>
+      <span class="widget-hint">Young/Daly first-order model</span>
+    </div>
+    <div class="controls">
+      <div class="control"><label for="preset">Failure-rate preset</label>
+        <select id="preset">
+          <option value="50800" selected>Llama 3 pretraining (reported) · ~5.8 yr/GPU</option>
+          <option value="26280">Twice as failure-prone · 3 yr/GPU</option>
+          <option value="87600">More reliable fleet · 10 yr/GPU</option>
+        </select></div>
+      <div class="control"><label for="n">GPUs <output for="n"></output></label><input type="range" id="n" min="6" max="17" step="1" value="14"></div>
+      <div class="control"><label for="d">Checkpoint stall δ <output for="d"></output></label><input type="range" id="d" min="0" max="11" step="1" value="6"></div>
+      <div class="control"><label for="r">Restart cost R <output for="r"></output></label><input type="range" id="r" min="0" max="9" step="1" value="6"></div>
+      <div class="control"><label for="mine">Your interval <output for="mine"></output></label><input type="range" id="mine" min="0" max="14" step="1" value="8"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Job MTBF</div><div class="stat-value" id="o-m">–</div><div class="stat-sub" id="o-fpd"></div></div>
+      <div class="stat"><div class="stat-label">Optimal interval</div><div class="stat-value good" id="o-tau">–</div></div>
+      <div class="stat"><div class="stat-label">Best goodput</div><div class="stat-value" id="o-best">–</div></div>
+      <div class="stat"><div class="stat-label">At your interval</div><div class="stat-value" id="o-mine">–</div><div class="stat-sub" id="o-gpuh"></div></div>
+    </div>
+    <svg id="chart" viewBox="0 0 720 300" role="img" aria-label="Goodput as a function of checkpoint interval, with the optimum and your chosen interval marked"></svg>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>goodput, current settings</span>
+      <span><i style="background:var(--accent2)"></i>same, with restart cost ÷ 5</span>
+      <span><i style="background:var(--ok)"></i>optimum</span>
+      <span><i style="background:var(--warn)"></i>your interval</span>
+    </div>
+
+    <h3 class="widget-title" style="margin-top:1.4rem">Which lever is worth the most?</h3>
+    <div class="prose" style="margin-top:.6rem">
+      <p class="callout" id="lever" style="margin:0 0 .8rem"></p>
+      <table class="sens"><thead><tr><th>Improvement (re-optimized interval)</th><th class="num">Best goodput</th><th class="num">Gain</th><th class="num">GPU-hours / day back</th></tr></thead><tbody id="sens"></tbody></table>
+    </div>
+  </figure>
+
+  <div class="prose">
+    <h2>Reading the sensitivity table</h2>
+    <p>The ranking depends on where you start, and that is the point. With the defaults (2-minute blocking checkpoints at 16K GPUs), making checkpoints asynchronous or in-memory is the biggest lever. Now set the checkpoint stall to 10 seconds, which is what async and in-memory checkpointing aim for, and look again. With cheap checkpoints, the optimum moves to a few minutes and the remaining waste is mostly the <strong>restart cost paid on every failure</strong>. Cutting it 5× becomes the top lever, ahead of halving the failure rate.</p>
+    <p>Restart cost is mostly not hardware:</p>
+    <ul>
+      <li><strong>Detection:</strong> waiting for a collective timeout (10 minutes by default in PyTorch) before anything happens.</li>
+      <li><strong>Attribution:</strong> working out <em>which</em> node to drain. Get it wrong and the restarted job lands on the same bad link (see <a href="ring-allreduce-failure.html">why every rank reports the same error</a>).</li>
+      <li><strong>Blast radius:</strong> tearing down every process, reinitializing CUDA and NCCL on every rank, and reloading from remote storage, when one node failed.</li>
+    </ul>
+    <p>The same levers shrink lost work: in-memory or peer checkpoints make <code>δ</code> small enough to checkpoint every few minutes.</p>
+
+    <h2>Where this goes</h2>
+    <p><a href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener">goodput</a> targets the restart-cost term directly: fast, correct attribution to the culprit rank and component, then the smallest safe recovery (in-process communicator re-init, single-node replacement, peer in-memory restore). Its thesis is literally <code>loss per fault ≈ MTTD + MTTR + lost work + false-positive cost</code>. This page is the back-of-envelope version. The repo will measure it.</p>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>Failures are independent and exponential with a constant per-GPU rate. Real fleets show infant mortality, correlated failures (a switch takes out many GPUs) and bad-node repeat offenders.</li>
+      <li>First-order waste model <code>δ/τ + (τ/2 + R)/M</code>, valid while <code>τ ≪ M</code>. Goodput is clamped at 0 when the model breaks down.</li>
+      <li>Checkpoints are fully blocking. Async checkpointing shrinks the effective <code>δ</code>, which you can model with the δ slider.</li>
+      <li>The Llama 3 preset derives a per-GPU rate from the paper’s reported job interruptions (419 unexpected in 54 days on 16,384 GPUs). It is not a component spec.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="nccl-timeout-triage.html"><div class="k">Next · interactive</div><div class="v">Reading the crime scene: triaging an NCCL timeout</div></a>
+      <a class="card" href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener"><div class="k">Repo</div><div class="v">goodput: fault attribution &amp; recovery ↗</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+(function () {
+  const D = [5, 10, 20, 30, 45, 60, 120, 180, 300, 600, 900, 1800];             // checkpoint stall, s
+  const R = [30, 60, 120, 180, 300, 600, 1200, 1800, 2700, 3600];                // restart cost, s
+  const T = [60, 120, 300, 600, 900, 1200, 1800, 2700, 3600, 5400, 7200, 10800, 14400, 21600, 43200]; // your interval, s
+  const N = i => 2 ** i;
+
+  const waste = (tau, d, r, M) => d / tau + (tau / 2 + r) / M;
+  const good = (tau, d, r, M) => Math.max(0, 1 - waste(tau, d, r, M));
+  const tauOpt = (d, M) => Math.sqrt(2 * d * M);
+  const best = (d, r, M) => good(tauOpt(d, M), d, r, M);
+  const pct = g => `${(100 * g).toFixed(1)}%`;
+
+  const svgEl = P.$('#chart');
+  const X0 = 52, X1 = 700, Y0 = 20, Y1 = 260, LMIN = Math.log10(30), LMAX = Math.log10(86400);
+  const sx = t => X0 + (Math.log10(t) - LMIN) / (LMAX - LMIN) * (X1 - X0);
+  const sy = g => Y1 - g * (Y1 - Y0);
+
+  function chart(d, r, M, mine) {
+    svgEl.innerHTML = '';
+    for (const g of [0, 0.25, 0.5, 0.75, 1]) {
+      P.svg('line', { x1: X0, y1: sy(g), x2: X1, y2: sy(g), class: 'grid' }, svgEl);
+      P.svg('text', { x: X0 - 8, y: sy(g) + 3, class: 'ax-t', 'text-anchor': 'end' }, svgEl).textContent = `${g * 100}%`;
+    }
+    for (const [t, l] of [[60, '1m'], [300, '5m'], [900, '15m'], [3600, '1h'], [14400, '4h'], [86400, '24h']]) {
+      P.svg('line', { x1: sx(t), y1: Y0, x2: sx(t), y2: Y1, class: 'grid' }, svgEl);
+      P.svg('text', { x: sx(t), y: Y1 + 16, class: 'ax-t', 'text-anchor': 'middle' }, svgEl).textContent = l;
+    }
+    P.svg('text', { x: (X0 + X1) / 2, y: Y1 + 34, class: 'ax-t', 'text-anchor': 'middle' }, svgEl).textContent = 'checkpoint interval (log scale)';
+    const path = (rr, cls) => {
+      let dstr = '';
+      for (let i = 0; i <= 200; i++) {
+        const t = 10 ** (LMIN + (LMAX - LMIN) * i / 200);
+        dstr += `${i ? 'L' : 'M'}${sx(t).toFixed(1)},${sy(good(t, d, rr, M)).toFixed(1)}`;
+      }
+      P.svg('path', { d: dstr, class: cls }, svgEl);
+    };
+    path(r / 5, 'curve alt');
+    path(r, 'curve');
+    const to = Math.min(Math.max(tauOpt(d, M), 30), 86400);
+    P.svg('circle', { cx: sx(to), cy: sy(good(to, d, r, M)), r: 5, class: 'opt' }, svgEl);
+    P.svg('text', { x: sx(to), y: sy(good(to, d, r, M)) - 10, class: 'opt-t', 'text-anchor': 'middle' }, svgEl).textContent = `τ* ${P.seconds(to)}`;
+    P.svg('line', { x1: sx(mine), y1: Y0, x2: sx(mine), y2: Y1, class: 'mine' }, svgEl);
+    P.svg('text', { x: sx(mine) + 5, y: Y1 - 6, class: 'mine-t' }, svgEl).textContent = 'yours';
+  }
+
+  function update() {
+    const m = +P.$('#preset').value * 3600, n = N(+P.$('#n').value);
+    const d = D[+P.$('#d').value], r = R[+P.$('#r').value], mine = T[+P.$('#mine').value];
+    const M = m / n;
+    P.$('#o-m').textContent = P.seconds(M);
+    P.$('#o-fpd').textContent = `${(86400 / M).toFixed(M > 86400 ? 2 : 1)} failures / day`;
+    P.$('#o-tau').textContent = P.seconds(tauOpt(d, M));
+    const b = best(d, r, M), g = good(mine, d, r, M);
+    const bv = P.$('#o-best'); bv.textContent = pct(b); bv.className = 'stat-value ' + (b > 0.9 ? 'good' : b > 0.75 ? 'warn' : 'bad');
+    const mv = P.$('#o-mine'); mv.textContent = pct(g); mv.className = 'stat-value ' + (g > 0.9 ? 'good' : g > 0.75 ? 'warn' : 'bad');
+    P.$('#o-gpuh').textContent = `${P.num((b - g) * n * 24)} GPU-h/day vs optimum`;
+    chart(d, r, M, mine);
+
+    const rows = [
+      ['Checkpoint stall δ ÷ 2', best(d / 2, r, M)],
+      ['Checkpoint stall δ ÷ 10 (async / in-memory)', best(d / 10, r, M)],
+      ['Restart cost R ÷ 2', best(d, r / 2, M)],
+      ['Restart cost R ÷ 5 (fast attribution + small blast radius)', best(d, r / 5, M)],
+      ['Failure rate ÷ 2 (better hardware / burn-in)', best(d, r, M * 2)],
+    ].sort((a, b2) => b2[1] - a[1]);
+    P.$('#lever').innerHTML = `<b>Top lever at these settings:</b> ${rows[0][0].toLowerCase()}, worth +${(100 * (rows[0][1] - b)).toFixed(1)} points of goodput.`;
+    P.$('#sens').innerHTML = rows.map(([label, v]) =>
+      `<tr><td>${label}</td><td class="num">${pct(v)}</td><td class="num up">+${(100 * (v - b)).toFixed(1)} pts</td><td class="num">${P.num((v - b) * n * 24)}</td></tr>`).join('');
+  }
+
+  P.bind('n', v => N(v).toLocaleString(), update);
+  P.bind('d', v => P.seconds(D[v]), update);
+  P.bind('r', v => P.seconds(R[v]), update);
+  P.bind('mine', v => P.seconds(T[v]), update);
+  P.$('#preset').addEventListener('input', update);
+  update();
+})();
+</script>
+</body>
+</html>

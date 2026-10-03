@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PFC: the lossless network that can freeze itself — Naresh Kumar</title>
+<meta name="description" content="An interactive toy RoCE fabric: watch Priority Flow Control pause frames form a cyclic buffer dependency and deadlock, then see how breaking the cycle or ECN-based congestion control prevents it.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/pfc-deadlock.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="PFC: the lossless network that can freeze itself">
+<meta property="og:description" content="Step a toy RoCE fabric into a pause-frame deadlock, then turn on ECN and watch it stay up.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/pfc-deadlock.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .sw rect.box { fill: var(--bg); stroke: var(--border-bright); stroke-width: 1.5; }
+  .sw.dl rect.box { stroke: var(--bad); }
+  .sw text.name { fill: var(--text); font-size: 13px; font-weight: 700; }
+  .sw text.q { fill: var(--text-dim); font-size: 10px; }
+  .cell { stroke: #0a0c10; stroke-width: 1; }
+  .cell.empty { fill: var(--bg3); }
+  .cell.transit { fill: var(--accent); }
+  .cell.local { fill: var(--accent2); }
+  .thr { stroke-width: 1.5; }
+  .thr.xoff { stroke: var(--bad); } .thr.kmin { stroke: var(--warn); stroke-dasharray: 2 2; }
+  .lnk { stroke-width: 3; fill: none; }
+  .lnk.ok { stroke: var(--ok); } .lnk.paused { stroke: var(--bad); stroke-dasharray: 7 5; } .lnk.off { stroke: var(--border-bright); }
+  .lnk-label { font-size: 10px; font-weight: 700; text-anchor: middle; }
+  .host { fill: var(--text-dim); font-size: 10px; text-anchor: middle; }
+  .banner { font-size: 15px; font-weight: 700; text-anchor: middle; }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"PFC: the lossless network that can freeze itself","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-03"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip chip-accent">Fabric</span><span class="chip">▶ Interactive</span></div>
+    <h1>PFC: the lossless network that can freeze itself</h1>
+    <p class="post-dek">RoCE wants a network that never drops a packet. Priority Flow Control delivers that by letting a switch tell its neighbour to stop. Arrange the “stop”s in a cycle and nobody ever starts again.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 7 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>PFC pauses a link when the receiver’s buffer crosses a threshold (XOFF). Losslessness is enforced hop by hop with back-pressure.</li>
+      <li>If buffer dependencies form a <b>cycle</b>, the pauses can hold each other forever: a deadlock that persists <em>even after the traffic stops</em>.</li>
+      <li>The fixes either break the cycle (routing), keep queues below XOFF (ECN-based congestion control such as DCQCN), or detect and break the deadlock (watchdogs). Side effect: the port sending the most pauses is often a victim, not the cause.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>Why RoCE wants a lossless fabric</h2>
+    <p>RDMA NICs implement the transport in hardware, and RoCE v2’s classic loss recovery is go-back-N: one drop can trigger a retransmission of everything after it. In a training cluster, collectives move gradient buffers that can be gigabytes, so a little loss means a large throughput hit. Operators therefore run RDMA traffic in a <strong>lossless</strong> priority class using PFC (IEEE 802.1Qbb).</p>
+    <p>The mechanism is simple. When a switch’s ingress buffer for a priority fills past <strong>XOFF</strong>, it sends a PAUSE frame upstream for that priority. When the buffer drains below <strong>XON</strong>, it sends a resume. Packets wait instead of being dropped.</p>
+
+    <h2>How waiting turns into deadlock</h2>
+    <p>A paused upstream switch keeps receiving traffic, so its own buffers fill and it pauses <em>its</em> upstream. Back-pressure spreads hop by hop. Usually it ends at a host NIC, which simply sends less. But if the waits form a cycle (switch A waiting on B, B on C, C on D, D on A), every buffer is full of packets that can only leave through a paused link. Nothing drains, so nothing resumes.</p>
+    <p>Clos fabrics with up-down routing don’t have such cycles in steady state. They appear through link failures and reroutes (packets bouncing leaf → spine → leaf → spine), through misconfiguration, or through flooding. The toy below forces the cycle with four flows that each cross two hops around a ring of switches.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="sim-title">
+    <div class="widget-head">
+      <span class="widget-title" id="sim-title">Toy lossless fabric</span>
+      <span class="widget-hint">Run, then hit “Burst”</span>
+    </div>
+    <svg id="fab" viewBox="0 0 640 430" role="img" aria-label="Four switches in a ring with per-switch ingress buffers and link pause state. Status is summarized below."></svg>
+    <div class="controls">
+      <div class="control"><label for="load">Offered load per flow <output for="load"></output></label><input type="range" id="load" min="5" max="50" step="5" value="20"></div>
+      <div class="control"><label for="flows">Flows</label>
+        <select id="flows"><option value="4" selected>4 flows: cyclic dependency</option><option value="3">3 flows: cycle broken</option></select></div>
+    </div>
+    <div class="btn-row">
+      <button class="wbtn primary" id="b-run">▶ Run</button>
+      <button class="wbtn danger" id="b-burst">⚡ Burst</button>
+      <button class="wbtn" id="b-ecn" aria-pressed="false">ECN / DCQCN: off</button>
+      <button class="wbtn" id="b-stop" aria-pressed="false">Hosts sending: on</button>
+      <button class="wbtn" id="b-reset">↺ Reset</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>transit packet (needs next link)</span>
+      <span><i style="background:var(--accent2)"></i>local packet (exits here)</span>
+      <span><i style="background:var(--ok)"></i>link sending</span>
+      <span><i style="background:var(--bad)"></i>link paused</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Fabric state</div><div class="stat-value" id="o-state">–</div></div>
+      <div class="stat"><div class="stat-label">Delivered / tick</div><div class="stat-value" id="o-tput">–</div><div class="stat-sub">8-tick average</div></div>
+      <div class="stat"><div class="stat-label">PAUSE frames sent</div><div class="stat-value" id="o-pause">–</div></div>
+      <div class="stat"><div class="stat-label">Paused links</div><div class="stat-value" id="o-plinks">–</div></div>
+    </div>
+    <p class="callout" id="note">Press Run. At moderate load, queues rise and fall and pauses come and go. Press Burst to make every host dump a full send queue at once.</p>
+  </figure>
+
+  <div class="prose">
+    <h2>What to try</h2>
+    <ol>
+      <li><strong>Run, then Burst.</strong> Within a few ticks every link is paused and throughput drops to zero. Now turn <em>Hosts sending</em> off. The deadlock stays: the packets that would drain are behind packets that can’t move.</li>
+      <li><strong>Switch to 3 flows.</strong> Removing one flow breaks the cycle. One switch now holds only local traffic, which always drains, so the chain of pauses always has an end. Pauses still happen. Deadlock can’t.</li>
+      <li><strong>Back to 4 flows, turn ECN on, Burst.</strong> Switches mark packets once a queue passes a lower threshold (Kmin), and senders cut their rate before buffers reach XOFF. PFC becomes a rare safety net instead of the main flow control.</li>
+    </ol>
+
+    <h2>How production fabrics deal with it</h2>
+    <ul>
+      <li><strong>Remove cycles:</strong> up-down routing, and care with reroutes after link failures so packets never bounce back up.</li>
+      <li><strong>Keep PFC as a backstop:</strong> ECN with DCQCN (or delay-based schemes) keeps queues short, so PFC rarely fires. This is the same reason DCQCN thresholds sit well below XOFF.</li>
+      <li><strong>Watch for storms:</strong> switch and NIC PFC watchdogs detect a queue that stays paused too long and drop or disable lossless mode on it, trading a few drops for liveness.</li>
+      <li><strong>Make the NIC more loss-tolerant:</strong> newer RDMA NICs support selective retransmission, which reduces the need for a strictly lossless fabric.</li>
+    </ul>
+
+    <h2>The debugging trap: victims look like culprits</h2>
+    <p>Look at the pause counters during a storm. Pauses propagate upstream, so the switches and NICs <em>furthest</em> from the cause can show the highest pause counts. A dashboard sorted by “most pause frames sent” points straight at a victim. Attribution has to follow the dependency back to the port where the backlog started.</p>
+    <p>That is one of the things <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof</a> does. It ties NIC counter evidence to excess training step time, and it traces pause propagation back to its origin so the loudest port isn’t automatically blamed. It’s also why my <a href="kv-cache-transfer.html">disaggregated inference</a> work treats congestion as part of the transport design, not an afterthought.</p>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>This is a teaching toy, not a fabric simulator: 4 switches, one lossless priority, one FIFO ingress buffer per switch (20 packets, XOFF 16, XON 10, Kmin 6), links at 4 packets/tick, host-facing ports at 1 packet/tick (the congestion point, like an incast receiver), and no pause-propagation delay.</li>
+      <li>Flow <code>i</code> enters at switch <code>i</code> and exits at <code>i+2</code>. The single FIFO creates head-of-line blocking, which is what lets a cycle hold.</li>
+      <li>“ECN / DCQCN” here is a simple multiplicative-decrease, additive-increase sender reacting to marks. Real DCQCN has rate timers, byte counters and alpha estimation.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="ring-allreduce-failure.html"><div class="k">Interactive</div><div class="v">One dead link, 512 idle GPUs: ring all-reduce under failure</div></a>
+      <a class="card" href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener"><div class="k">Repo</div><div class="v">nicprof: NIC counters → step time ↗</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+(function () {
+  const BUF = 20, XOFF = 16, XON = 10, KMIN = 6, CAP = 4, HOST_CAP = 1, IQ_MAX = 40;
+  const NAMES = ['A', 'B', 'C', 'D'];
+  const POS = [[170, 120], [470, 120], [470, 320], [170, 320]];
+  const svgEl = P.$('#fab');
+  let Q, IQ, paused, rate, pauses, deliveredHist, ecn = false, sending = true, timer = null, tick, stuckTicks, credit, txCredit;
+
+  const flowsOn = () => +P.$('#flows').value;           // 4 = all, 3 = flow D (3) removed
+  const flowActive = i => !(flowsOn() === 3 && i === 3);
+
+  function reset() {
+    Q = [[], [], [], []];          // ingress buffer at switch k (from link k-1 → k)
+    IQ = [0, 0, 0, 0];             // host-injected packets waiting at switch k
+    paused = [false, false, false, false];   // link k → k+1 paused by switch k+1
+    rate = [1, 1, 1, 1];           // DCQCN-ish rate multiplier per flow
+    credit = [0, 0, 0, 0]; txCredit = [0, 0, 0, 0];
+    pauses = 0; deliveredHist = []; tick = 0; stuckTicks = 0;
+    draw();
+  }
+
+  function step() {
+    tick++;
+    const load = +P.$('#load').value / 100 * CAP;  // packets/tick per flow at full rate
+    let delivered = 0, moved = 0;
+
+    // 1. Applications hand packets to the host NIC's send queue
+    for (let i = 0; i < 4; i++) {
+      if (!sending || !flowActive(i)) continue;
+      credit[i] += load;
+      while (credit[i] >= 1 && IQ[i] < IQ_MAX) { IQ[i]++; credit[i]--; }
+      if (IQ[i] >= IQ_MAX) credit[i] = 0;
+    }
+
+    // 2. Each switch services its FIFO head (local → host port, transit → next link), then the
+    //    attached host NIC sends on the remaining link capacity, limited by its congestion-control rate.
+    const incoming = [[], [], [], []];
+    for (let k = 0; k < 4; k++) {
+      let linkCap = paused[k] ? 0 : CAP, hostCap = HOST_CAP;
+      const nxt = (k + 1) % 4;
+      while (Q[k].length) {
+        const head = Q[k][0];
+        if (head.t === 'local') { if (hostCap <= 0) break; hostCap--; Q[k].shift(); delivered++; moved++; }
+        else { if (linkCap <= 0) break; linkCap--; Q[k].shift(); incoming[nxt].push({ t: 'local', f: head.f }); moved++; }
+      }
+      txCredit[k] = Math.min(txCredit[k] + CAP * rate[k], CAP);
+      while (IQ[k] > 0 && linkCap > 0 && txCredit[k] >= 1) {
+        IQ[k]--; linkCap--; txCredit[k]--; incoming[nxt].push({ t: 'transit', f: k }); moved++;
+      }
+    }
+
+    // 3. Enqueue arrivals; ECN marks above KMIN slow the senders of marked packets
+    for (let k = 0; k < 4; k++) {
+      for (const p of incoming[k]) {
+        if (Q[k].length >= BUF) continue;     // can't happen with PFC headroom; guard only
+        Q[k].push(p);
+        if (ecn && Q[k].length > KMIN) rate[p.f] = Math.max(0.1, rate[p.f] * 0.85);
+      }
+    }
+    for (let i = 0; i < 4; i++) rate[i] = Math.min(1, rate[i] + (ecn ? 0.02 : 1));
+
+    // 4. PFC: switch k pauses its upstream link (k-1 → k) at XOFF, resumes at XON
+    for (let k = 0; k < 4; k++) {
+      const up = (k + 3) % 4;
+      if (!paused[up] && Q[k].length >= XOFF) { paused[up] = true; pauses++; }
+      else if (paused[up] && Q[k].length <= XON) paused[up] = false;
+      else if (paused[up]) pauses++;          // pause frames are refreshed while the condition holds
+    }
+
+    deliveredHist.push(delivered); if (deliveredHist.length > 8) deliveredHist.shift();
+    stuckTicks = (moved === 0 && Q.some(q => q.length)) ? stuckTicks + 1 : 0;
+    draw();
+  }
+
+  function isDeadlocked() { return stuckTicks >= 3; }
+
+  function draw() {
+    svgEl.innerHTML = '';
+    const dl = isDeadlocked();
+    // links k → k+1, drawn along the square
+    const ends = [
+      [[235, 120], [405, 120]], [[470, 158], [470, 282]],
+      [[405, 320], [235, 320]], [[170, 282], [170, 158]],
+    ];
+    const defs = P.svg('defs', {}, svgEl);
+    [['ok', 'var(--ok)'], ['paused', 'var(--bad)'], ['off', 'var(--border-bright)']].forEach(([id, c]) => {
+      const m = P.svg('marker', { id: 'ar-' + id, markerWidth: 8, markerHeight: 8, refX: 6, refY: 4, orient: 'auto' }, defs);
+      P.svg('path', { d: 'M0,0 L8,4 L0,8 z', fill: c }, m);
+    });
+    for (let k = 0; k < 4; k++) {
+      const [[x1, y1], [x2, y2]] = ends[k];
+      const used = flowActive(k) || flowActive((k + 3) % 4);
+      const cls = paused[k] ? 'paused' : used ? 'ok' : 'off';
+      P.svg('line', { x1, y1, x2, y2, class: `lnk ${cls}`, 'marker-end': `url(#ar-${cls})` }, svgEl);
+      const mx = (x1 + x2) / 2 + (k === 1 ? 22 : k === 3 ? -22 : 0), my = (y1 + y2) / 2 + (k === 0 ? -10 : k === 2 ? 18 : 4);
+      P.svg('text', { x: mx, y: my, class: 'lnk-label', fill: paused[k] ? 'var(--bad)' : 'var(--text-dim)' }, svgEl)
+        .textContent = paused[k] ? 'PAUSE' : `${NAMES[k]}→${NAMES[(k + 1) % 4]}`;
+    }
+    // switches with buffers
+    for (let k = 0; k < 4; k++) {
+      const [cx, cy] = POS[k];
+      const g = P.svg('g', { class: 'sw' + (dl && Q[k].length ? ' dl' : '') }, svgEl);
+      P.svg('rect', { x: cx - 66, y: cy - 38, width: 132, height: 76, rx: 6, class: 'box' }, g);
+      P.svg('text', { x: cx - 56, y: cy - 20, class: 'name' }, g).textContent = `switch ${NAMES[k]}`;
+      P.svg('text', { x: cx + 56, y: cy - 20, class: 'q', 'text-anchor': 'end' }, g).textContent = `${Q[k].length}/${BUF}`;
+      const cw = 5.6, x0 = cx - 56, y0 = cy - 6;
+      for (let j = 0; j < BUF; j++) {
+        const p = Q[k][j];
+        P.svg('rect', { x: x0 + j * cw, y: y0, width: cw, height: 18, class: 'cell ' + (p ? p.t : 'empty') }, g);
+      }
+      P.svg('line', { x1: x0 + XOFF * cw, y1: y0 - 4, x2: x0 + XOFF * cw, y2: y0 + 22, class: 'thr xoff' }, g);
+      if (ecn) P.svg('line', { x1: x0 + KMIN * cw, y1: y0 - 4, x2: x0 + KMIN * cw, y2: y0 + 22, class: 'thr kmin' }, g);
+      P.svg('text', { x: cx - 56, y: cy + 30, class: 'q' }, g).textContent =
+        flowActive(k) ? `host ${NAMES[k]}: ${Math.round(100 * rate[k])}% rate` : `host ${NAMES[k]}: idle`;
+    }
+    P.svg('text', { x: 320, y: 225, class: 'banner', fill: dl ? 'var(--bad)' : paused.some(Boolean) ? 'var(--warn)' : 'var(--ok)' }, svgEl)
+      .textContent = dl ? 'DEADLOCK' : paused.some(Boolean) ? 'back-pressure' : 'flowing';
+    P.svg('text', { x: 320, y: 410, class: 'host' }, svgEl).textContent = `tick ${tick} · flow i: host i → switch i → i+1 → i+2 → host`;
+
+    // stats
+    const st = P.$('#o-state');
+    st.textContent = dl ? 'DEADLOCK' : paused.some(Boolean) ? 'congested' : 'flowing';
+    st.className = 'stat-value ' + (dl ? 'bad' : paused.some(Boolean) ? 'warn' : 'good');
+    const avg = deliveredHist.length ? deliveredHist.reduce((a, b) => a + b, 0) / deliveredHist.length : 0;
+    P.$('#o-tput').textContent = avg.toFixed(1);
+    P.$('#o-pause').textContent = pauses.toLocaleString();
+    P.$('#o-plinks').textContent = `${paused.filter(Boolean).length} / 4`;
+    if (dl) P.$('#note').innerHTML = sending
+      ? '<b>Deadlocked.</b> Every buffer’s head packet needs a paused link. Now turn <em>Hosts sending</em> off: it won’t recover.'
+      : '<b>Still deadlocked with zero offered load.</b> Only breaking the cycle, or a PFC watchdog dropping packets, can clear this. Reset and try 3 flows or ECN.';
+  }
+
+  function run() { if (timer) { clearInterval(timer); timer = null; P.$('#b-run').textContent = '▶ Run'; return; }
+    timer = setInterval(step, P.reduced() ? 600 : 260); P.$('#b-run').textContent = '❚❚ Pause'; }
+  P.$('#b-run').addEventListener('click', run);
+  P.$('#b-burst').addEventListener('click', () => {
+    // A synchronized burst: every active host dumps a full send queue at once (think: a collective starting).
+    for (let k = 0; k < 4; k++) if (flowActive(k)) IQ[k] = IQ_MAX;
+    if (!timer) run(); else draw();
+  });
+  P.$('#b-ecn').addEventListener('click', e => {
+    ecn = !ecn; e.target.setAttribute('aria-pressed', String(ecn)); e.target.textContent = `ECN / DCQCN: ${ecn ? 'on' : 'off'}`; draw();
+  });
+  P.$('#b-stop').addEventListener('click', e => {
+    sending = !sending; e.target.setAttribute('aria-pressed', String(!sending)); e.target.textContent = `Hosts sending: ${sending ? 'on' : 'off'}`;
+  });
+  P.$('#b-reset').addEventListener('click', () => {
+    P.$('#note').innerHTML = 'Press Run. At moderate load, queues rise and fall and pauses come and go. Press Burst to make every host dump a full send queue at once.';
+    reset();
+  });
+  P.bind('load', v => `${v}% of link`, null);
+  P.$('#flows').addEventListener('input', reset);
+  reset();
+})();
+</script>
+</body>
+</html>

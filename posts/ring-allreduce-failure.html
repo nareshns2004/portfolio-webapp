@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>One dead link, 512 idle GPUs: ring all-reduce under failure — Naresh Kumar</title>
+<meta name="description" content="An interactive look at ring all-reduce: why it is bandwidth-optimal, why one failed link stalls every rank, and why the first rank to report a timeout is not the culprit.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/ring-allreduce-failure.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="One dead link, 512 idle GPUs: ring all-reduce under failure">
+<meta property="og:description" content="Cut a link in a live ring and watch every rank time out the same way.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/ring-allreduce-failure.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0a0c10">
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .rank-node circle { stroke-width: 2; transition: fill 0.25s, stroke 0.25s; }
+  .rank-node.run circle { fill: #0d2a33; stroke: var(--accent); }
+  .rank-node.wait circle { fill: #33290b; stroke: var(--warn); }
+  .rank-node.done circle { fill: #0c2e22; stroke: var(--ok); }
+  .rank-node.dead circle { fill: #3a1414; stroke: var(--bad); }
+  .rank-node text { fill: var(--text); font-size: 12px; font-weight: 700; text-anchor: middle; }
+  .rank-step { fill: var(--text-dim); font-size: 10px; text-anchor: middle; }
+  .ring-edge { stroke: var(--border-bright); stroke-width: 3; }
+  .ring-edge.cut { stroke: var(--bad); stroke-dasharray: 6 5; }
+  .edge-hit { stroke: transparent; stroke-width: 18; cursor: pointer; }
+  .edge-hit:hover + .ring-edge, .edge-hit:focus + .ring-edge { stroke: var(--text-mid); }
+  .pkt { fill: var(--accent); }
+  .pkt.stuck { fill: var(--bad); }
+  .phase { fill: var(--text-mid); font-size: 13px; text-anchor: middle; }
+  .phase-sub { fill: var(--text-dim); font-size: 11px; text-anchor: middle; }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"One dead link, 512 idle GPUs: ring all-reduce under failure","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-03"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip chip-accent">Reliability</span><span class="chip">▶ Interactive</span></div>
+    <h1>One dead link, 512 idle GPUs: ring all-reduce under failure</h1>
+    <p class="post-dek">Ring all-reduce is close to bandwidth-optimal, and that same design makes it a chain. Break one link and every rank stalls, then every rank reports the same timeout.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 8 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>Each GPU in a ring all-reduce sends about <code>2·S</code> bytes no matter how many GPUs there are. That is why rings scale.</li>
+      <li>Every step depends on the neighbour’s previous step, so one failed link stalls the whole ring within <code>N−1</code> steps.</li>
+      <li>Every rank then times out in the same collective with the same message. The first rank to report it is usually not the culprit. <b>Symptoms are global, causes are local.</b></li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>Why a ring?</h2>
+    <p>Data-parallel training ends every step by summing gradients across all GPUs. The naive approach sends everything to one GPU and broadcasts the result back, which makes that GPU’s link the bottleneck. Ring all-reduce arranges the <code>N</code> GPUs in a cycle and splits the buffer of size <code>S</code> into <code>N</code> chunks:</p>
+    <ol>
+      <li><strong>Reduce-scatter</strong> (<code>N−1</code> steps): each GPU sends one chunk to its right neighbour and adds the chunk arriving from its left. Afterwards, each GPU owns one fully-reduced chunk.</li>
+      <li><strong>All-gather</strong> (<code>N−1</code> steps): the reduced chunks travel once more around the ring until every GPU has all of them.</li>
+    </ol>
+    <p>Each step moves <code>S/N</code> bytes per link, and there are <code>2(N−1)</code> steps. The standard α-β cost model gives:</p>
+    <div class="formula">T(N, S) ≈ 2(N−1)·α  +  2·(N−1)/N · S / B</div>
+    <p>Here <code>α</code> is per-step latency and <code>B</code> is per-GPU link bandwidth. The bandwidth term approaches <code>2S/B</code> as <code>N</code> grows, so it is <em>independent of cluster size</em>. The latency term grows linearly with <code>N</code>, which is why NCCL also has tree and other algorithms for small messages at scale. Try it:</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="calc-title">
+    <div class="widget-head">
+      <span class="widget-title" id="calc-title">All-reduce cost model</span>
+      <span class="widget-hint">α-β model, single ring</span>
+    </div>
+    <div class="controls">
+      <div class="control"><label for="c-size">Message size <output for="c-size"></output></label><input type="range" id="c-size" min="0" max="22" step="1" value="18"></div>
+      <div class="control"><label for="c-n">GPUs in ring <output for="c-n"></output></label><input type="range" id="c-n" min="1" max="14" step="1" value="9"></div>
+      <div class="control"><label for="c-bw">Per-GPU link <output for="c-bw"></output></label>
+        <select id="c-bw">
+          <option value="12.5">100 Gb/s</option><option value="25">200 Gb/s</option><option value="50" selected>400 Gb/s</option><option value="100">800 Gb/s</option>
+        </select></div>
+      <div class="control"><label for="c-alpha">Per-step latency α <output for="c-alpha"></output></label><input type="range" id="c-alpha" min="1" max="50" step="1" value="5"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Total time</div><div class="stat-value" id="o-t">–</div></div>
+      <div class="stat"><div class="stat-label">Bandwidth term</div><div class="stat-value" id="o-bw">–</div><div class="stat-sub" id="o-bwp"></div></div>
+      <div class="stat"><div class="stat-label">Latency term</div><div class="stat-value" id="o-lat">–</div><div class="stat-sub" id="o-latp"></div></div>
+      <div class="stat"><div class="stat-label">busbw</div><div class="stat-value" id="o-busbw">–</div><div class="stat-sub">nccl-tests definition</div></div>
+    </div>
+    <p class="callout" id="calc-insight"></p>
+  </figure>
+
+  <div class="prose">
+    <h2>The price of being a chain</h2>
+    <p>Nothing in the ring is optional. In step <code>s</code>, a GPU can only send what it finished in step <code>s−1</code>, and it can only finish step <code>s−1</code> once its left neighbour’s data has arrived. Every rank depends on every other rank within one lap.</p>
+    <p>Run the ring below, then <strong>click any link to cut it</strong> mid-collective (or use the button). The stall spreads one hop per step until every rank is waiting. Then the watchdogs fire.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="sim-title">
+    <div class="widget-head">
+      <span class="widget-title" id="sim-title">Ring all-reduce simulator</span>
+      <span class="widget-hint">Click a link to cut it</span>
+    </div>
+    <svg id="ring" viewBox="0 0 520 430" role="img" aria-label="Ring of GPUs running all-reduce. State is also described in the log below."></svg>
+    <div class="controls">
+      <div class="control"><label for="s-n">GPUs <output for="s-n"></output></label><input type="range" id="s-n" min="4" max="16" step="1" value="8"></div>
+      <div class="control"><label for="s-speed">Speed <output for="s-speed"></output></label><input type="range" id="s-speed" min="1" max="5" step="1" value="3"></div>
+    </div>
+    <div class="btn-row">
+      <button class="wbtn primary" id="b-play">▶ Run</button>
+      <button class="wbtn" id="b-step">Step</button>
+      <button class="wbtn danger" id="b-cut">✂ Cut a random link</button>
+      <button class="wbtn" id="b-reset">↺ Reset</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>running</span>
+      <span><i style="background:var(--warn)"></i>blocked on recv</span>
+      <span><i style="background:var(--bad)"></i>watchdog timeout</span>
+      <span><i style="background:var(--ok)"></i>collective done</span>
+    </div>
+    <div class="log" id="log" role="log" aria-live="polite"></div>
+  </figure>
+
+  <div class="prose">
+    <h2>What every rank sees</h2>
+    <p>Look at the log after the watchdogs fire. Every rank reports the same thing: a timeout in the same <code>ALLREDUCE</code>, with the same sequence number. The order is effectively random, because each rank’s watchdog thread wakes on its own schedule. The rank that reports first is just the one whose timer ran out first.</p>
+    <p>This is the core attribution problem in multi-node training. One bad cable produces <code>N</code> identical error messages, and the most visible one (the first in the aggregated logs) points at the wrong machine. Real clusters make it worse:</p>
+    <ul>
+      <li><strong>Detection is slow.</strong> The default timeout for a PyTorch NCCL process group is 10 minutes, so a cluster sits idle for minutes before anything fires.</li>
+      <li><strong>Many causes look the same.</strong> A dead link, a GPU that fell off the bus, a hung kernel on one rank, and a congested fabric that slows one hop all end as a collective timeout.</li>
+      <li><strong>Real NCCL is more tangled than one ring.</strong> It runs multiple channels, rings and trees across NVLink and the network, so a single failure can stall several of them at once.</li>
+    </ul>
+
+    <h2>What attribution actually needs</h2>
+    <p>To name the culprit, you need evidence that differs across ranks, not the error message that is identical on all of them:</p>
+    <ul>
+      <li><strong>Per-rank collective progress.</strong> PyTorch’s NCCL flight recorder keeps a ring buffer of recent collectives per rank. Comparing the last completed sequence number across ranks shows where the chain broke: the ranks that were stuck earliest sit right after the break.</li>
+      <li><strong>Lower-layer telemetry</strong> in the same time window: GPU Xid events and DCGM health, NIC error and pause counters, link flaps from the switch.</li>
+      <li><strong>Topology</strong> to map “rank 3 waiting on rank 2” onto a physical NIC, cable and switch port.</li>
+    </ul>
+    <p>The simulator’s step counters stand in for that flight recorder. Cut a link, let it run, and compare the step numbers: the lowest one sits just downstream of the cut. Try the <a href="nccl-timeout-triage.html">incident drill</a> to do the same with mixed signals.</p>
+
+    <h2>Why it matters for recovery</h2>
+    <p>Without attribution, the only safe move is to restart the whole job from the last checkpoint. Every rank pays for process start, CUDA and NCCL init, checkpoint load and warmup, plus the work since the last checkpoint, and the job may land on the same bad link again. With attribution, smaller recoveries become safe: drain one node, re-initialize communicators, and restore from a peer’s in-memory copy. How often you should checkpoint depends on all of this; there’s <a href="checkpoint-interval.html">a calculator for that</a>.</p>
+    <p>This is what I’m building in <a href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener">goodput</a>: fault injection with ground truth, flight-recorder signature capture, cross-layer correlation, and topology-aware recovery. It’s at milestone 1 of 6, with the design and harness in public and no results yet.</p>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>The cost model is the textbook α-β model for one ring. It ignores pipelining, multiple channels, NVLink vs network hierarchy, protocol choice (LL/LL128/Simple) and reduction compute.</li>
+      <li><code>busbw = algbw · 2(N−1)/N</code>, following the nccl-tests convention, so results are comparable across <code>N</code>.</li>
+      <li>The simulator runs one ring, one chunk per step, and a fixed watchdog compressed to a few seconds. The log lines are modeled on PyTorch’s <code>ProcessGroupNCCL</code> watchdog message. They are illustrative, not captured from a cluster.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="nccl-timeout-triage.html"><div class="k">Next · interactive</div><div class="v">Reading the crime scene: triaging an NCCL timeout</div></a>
+      <a class="card" href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener"><div class="k">Repo</div><div class="v">goodput: fault attribution &amp; recovery ↗</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+/* ── Cost model ── */
+(function () {
+  const sizes = i => 2 ** i * 1024;            // 1 KiB … 4 GiB
+  const ns = i => 2 ** i;                       // 2 … 16384
+  const update = () => {
+    const S = sizes(+P.$('#c-size').value), N = ns(+P.$('#c-n').value);
+    const B = +P.$('#c-bw').value * 1e9;        // bytes/s
+    const a = +P.$('#c-alpha').value * 1e-6;
+    const lat = 2 * (N - 1) * a, bw = 2 * (N - 1) / N * S / B, t = lat + bw;
+    P.$('#o-t').textContent = P.seconds(t);
+    P.$('#o-bw').textContent = P.seconds(bw);
+    P.$('#o-lat').textContent = P.seconds(lat);
+    P.$('#o-bwp').textContent = `${(100 * bw / t).toFixed(0)}% of total`;
+    P.$('#o-latp').textContent = `${(100 * lat / t).toFixed(0)}% of total`;
+    const busbw = (S / t) * 2 * (N - 1) / N;
+    P.$('#o-busbw').textContent = `${(busbw / 1e9).toFixed(1)} GB/s`;
+    P.$('#calc-insight').innerHTML = lat > bw
+      ? `<b>Latency-bound.</b> At ${N.toLocaleString()} GPUs, the ${2 * (N - 1)} sequential steps cost more than moving the bytes. Rings lose here; tree-style algorithms cut the step count to ~log N.`
+      : `<b>Bandwidth-bound.</b> Doubling the GPU count barely changes the time: per-GPU traffic stays near 2·S. This is why ring all-reduce scales for large gradient buckets.`;
+  };
+  P.bind('c-size', v => P.bytes(sizes(v)), update);
+  P.bind('c-n', v => ns(v).toLocaleString(), update);
+  P.bind('c-bw', (v, el) => `${(v * 8)} Gb/s`, update);
+  P.bind('c-alpha', v => `${v} µs`, update);
+  update();
+})();
+
+/* ── Ring simulator ── */
+(function () {
+  const svgEl = P.$('#ring'), logEl = P.$('#log');
+  const CX = 260, CY = 205, R = 160;
+  let N, done, cut, cutTick, jitter, tick, waitSince, dead, timer = null, packets = [], seq;
+
+  const pos = i => {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    return [CX + R * Math.cos(a), CY + R * Math.sin(a)];
+  };
+  const total = () => 2 * (N - 1);
+  const prev = r => (r - 1 + N) % N;
+
+  function log(cls, msg) {
+    const line = document.createElement('div');
+    line.innerHTML = `<span class="t">t=${String(tick).padStart(3, '0')}</span> <span class="${cls}">${msg}</span>`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function reset() {
+    stop();
+    N = +P.$('#s-n').value;
+    done = Array(N).fill(0); waitSince = Array(N).fill(null); dead = Array(N).fill(false);
+    cut = null; tick = 0; seq = 400 + Math.floor(Math.random() * 300); packets = [];
+    logEl.innerHTML = '';
+    log('i', `ALLREDUCE SeqNum=${seq} started on ${N} ranks (${total()} steps: ${N - 1} reduce-scatter + ${N - 1} all-gather)`);
+    P.$('#b-cut').disabled = false;
+    draw();
+  }
+
+  function cutLink(r) {              // link r → r+1
+    if (cut !== null || done.every(d => d === total())) return;
+    cut = r; cutTick = tick;
+    jitter = [...Array(N)].map(() => Math.random() * 3);
+    log('e', `link rank${r} → rank${(r + 1) % N} DOWN (no error is raised; sends just stop completing)`);
+    P.$('#b-cut').disabled = true;
+    draw();
+  }
+
+  function step() {
+    tick++;
+    const old = done.slice();
+    packets = [];
+    for (let r = 0; r < N; r++) {
+      if (dead[r] || old[r] >= total()) continue;
+      const p = prev(r);
+      const linkUp = cut !== p;
+      if (old[p] >= old[r] && linkUp) {
+        done[r] = old[r] + 1; waitSince[r] = null;
+        packets.push({ from: p, to: r, stuck: false });
+        if (done[r] === total()) log('o', `rank${r}: ALLREDUCE SeqNum=${seq} complete`);
+      } else {
+        if (waitSince[r] === null) {
+          waitSince[r] = tick;
+          const why = linkUp ? `rank${p} has not sent step ${old[r] + 1} yet` : `no data arriving on link from rank${p}`;
+          log('w', `rank${r}: blocked at step ${old[r] + 1}/${total()}: ${why}`);
+        }
+        if (!linkUp) packets.push({ from: p, to: r, stuck: true });
+      }
+    }
+    // Watchdogs: every rank entered the same collective at about the same time, so their timers expire
+    // together, one lap after the cut, in an order set by per-rank jitter rather than by who is at fault.
+    if (cut !== null) {
+      for (const r of [...Array(N).keys()].sort((x, y) => jitter[x] - jitter[y])) {
+        if (dead[r] || done[r] >= total() || tick < cutTick + N + 2 + jitter[r]) continue;
+        dead[r] = true;
+        log('e', `[rank${r}] Watchdog caught collective operation timeout: WorkNCCL(SeqNum=${seq}, OpType=ALLREDUCE, Timeout(ms)=600000) ran for 600${String(100 + Math.floor(Math.random() * 800)).padStart(3, '0')} milliseconds before timing out.`);
+      }
+      if (dead.every((d, r) => d || done[r] === total())) {
+        const lo = Math.min(...done);
+        const culprits = [...Array(N).keys()].filter(r => done[r] === lo);
+        log('i', `all ranks down. Lowest completed step = ${lo}, on rank${culprits.join(', rank')}. The break is just upstream: link rank${cut} → rank${(cut + 1) % N}.`);
+        stop();
+      }
+    } else if (done.every(d => d === total())) {
+      log('o', `collective finished in ${tick} ticks. Cut a link and rerun to see the failure.`);
+      stop();
+    }
+    draw(true);
+  }
+
+  function draw(animate) {
+    svgEl.innerHTML = '';
+    // edges
+    for (let r = 0; r < N; r++) {
+      const [x1, y1] = pos(r), [x2, y2] = pos((r + 1) % N);
+      const hit = P.svg('line', { x1, y1, x2, y2, class: 'edge-hit', tabindex: 0, role: 'button', 'aria-label': `Cut link rank ${r} to rank ${(r + 1) % N}` }, svgEl);
+      hit.addEventListener('click', () => cutLink(r));
+      hit.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cutLink(r); } });
+      P.svg('line', { x1, y1, x2, y2, class: 'ring-edge' + (cut === r ? ' cut' : '') }, svgEl);
+    }
+    // packets
+    for (const pk of packets) {
+      const [x1, y1] = pos(pk.from), [x2, y2] = pos(pk.to);
+      const c = P.svg('circle', { r: 5, class: 'pkt' + (pk.stuck ? ' stuck' : ''), cx: x1, cy: y1 }, svgEl);
+      if (pk.stuck) { c.setAttribute('cx', (x1 + x2) / 2); c.setAttribute('cy', (y1 + y2) / 2); continue; }
+      if (!animate || P.reduced()) { c.setAttribute('cx', x2); c.setAttribute('cy', y2); c.setAttribute('opacity', 0.5); continue; }
+      const dur = interval() * 0.85, t0 = performance.now();
+      (function frame(t) {
+        const k = Math.min(1, (t - t0) / dur);
+        c.setAttribute('cx', x1 + (x2 - x1) * k); c.setAttribute('cy', y1 + (y2 - y1) * k);
+        if (k < 1) requestAnimationFrame(frame);
+      })(t0);
+    }
+    // nodes
+    for (let r = 0; r < N; r++) {
+      const [x, y] = pos(r);
+      const state = dead[r] ? 'dead' : done[r] === total() ? 'done' : waitSince[r] !== null ? 'wait' : 'run';
+      const g = P.svg('g', { class: `rank-node ${state}` }, svgEl);
+      P.svg('circle', { cx: x, cy: y, r: N > 12 ? 17 : 21 }, g);
+      P.svg('text', { x, y: y + 4 }, g).textContent = r;
+      const [lx, ly] = [CX + (R + 36) * Math.cos(-Math.PI / 2 + 2 * Math.PI * r / N), CY + (R + 34) * Math.sin(-Math.PI / 2 + 2 * Math.PI * r / N)];
+      P.svg('text', { x: lx, y: ly + 3, class: 'rank-step' }, svgEl).textContent = `${done[r]}/${total()}`;
+    }
+    const minStep = Math.min(...done);
+    const phase = minStep >= total() ? 'complete' : minStep < N - 1 ? 'reduce-scatter' : 'all-gather';
+    P.svg('text', { x: CX, y: CY - 6, class: 'phase' }, svgEl).textContent = dead.some(Boolean) ? 'job stalled' : phase;
+    P.svg('text', { x: CX, y: CY + 14, class: 'phase-sub' }, svgEl).textContent = `tick ${tick} · ${N} ranks`;
+  }
+
+  const interval = () => [0, 1100, 800, 550, 350, 200][+P.$('#s-speed').value];
+  function play() { if (timer) return stop(); timer = setInterval(step, interval()); P.$('#b-play').textContent = '❚❚ Pause'; }
+  function stop() { clearInterval(timer); timer = null; P.$('#b-play').textContent = '▶ Run'; }
+
+  P.$('#b-play').addEventListener('click', () => {
+    if (done.every(d => d === total()) || dead.some(Boolean)) reset();
+    play();
+  });
+  P.$('#b-step').addEventListener('click', () => { stop(); step(); });
+  P.$('#b-cut').addEventListener('click', () => cutLink(Math.floor(Math.random() * N)));
+  P.$('#b-reset').addEventListener('click', reset);
+  P.bind('s-n', v => v, reset);
+  P.bind('s-speed', v => ['', 'slow', 'calm', 'normal', 'fast', 'faster'][v], () => { if (timer) { stop(); play(); } });
+  reset();
+})();
+</script>
+</body>
+</html>
