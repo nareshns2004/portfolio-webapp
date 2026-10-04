@@ -113,8 +113,8 @@
 /* ─── WRITING ─── */
 .writing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
 .post-card { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.7rem; position: relative; overflow: hidden; }
-.post-card.featured { grid-column: span 1; background: linear-gradient(160deg, rgba(34, 211, 238, 0.07), var(--bg2) 55%); border-color: rgba(34, 211, 238, 0.25); }
-.post-card.featured:nth-child(2) { background: linear-gradient(160deg, rgba(167, 139, 250, 0.08), var(--bg2) 55%); border-color: rgba(167, 139, 250, 0.25); }
+.post-card.featured { grid-column: span 1; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, transparent), var(--bg2) 55%); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.post-card.featured:nth-child(2) { background: linear-gradient(160deg, color-mix(in srgb, var(--accent2) 8%, transparent), var(--bg2) 55%); border-color: color-mix(in srgb, var(--accent2) 35%, transparent); }
 .post-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 .post-kind { margin-left: auto; }
 .post-kind.interactive { color: var(--ok); }
@@ -170,8 +170,8 @@ a.profile:hover { border-color: var(--pc); }
 .contact::before {
   content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 80% at 15% 0%, rgba(34, 211, 238, 0.10), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 85% 100%, rgba(167, 139, 250, 0.12), transparent 70%);
+    radial-gradient(ellipse 60% 80% at 15% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 80% at 85% 100%, color-mix(in srgb, var(--accent2) 8%, transparent), transparent 70%);
 }
 .contact > * { position: relative; }
 .contact h2 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.15; margin: 1rem 0; }
@@ -179,7 +179,7 @@ a.profile:hover { border-color: var(--pc); }
 .contact-badge {
   display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono); font-size: 0.72rem;
   letter-spacing: 0.1em; text-transform: uppercase; color: var(--ok);
-  border: 1px solid rgba(52, 211, 153, 0.35); background: rgba(52, 211, 153, 0.08); padding: 0.25rem 0.9rem; border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 6%, transparent); padding: 0.25rem 0.9rem; border-radius: 999px;
 }
 .contact-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; }
 .contact-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }

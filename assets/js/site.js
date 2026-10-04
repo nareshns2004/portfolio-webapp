@@ -5,6 +5,28 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   window.prefersReducedMotion = () => reduceMotion.matches;
 
+  // Theme toggle: light/dark override of the system setting, remembered per browser
+  const root = document.documentElement;
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : systemDark.matches;
+  const themeBtn = document.querySelector('.theme-toggle');
+  const syncThemeBtn = () => {
+    if (!themeBtn) return;
+    themeBtn.setAttribute('aria-label', `Switch to ${isDark() ? 'light' : 'dark'} theme`);
+    themeBtn.textContent = isDark() ? '☀' : '☾';
+  };
+  if (themeBtn) {
+    themeBtn.addEventListener('click', () => {
+      const next = isDark() ? 'light' : 'dark';
+      root.dataset.theme = next;
+      try { localStorage.setItem('theme', next); } catch (e) { /* storage unavailable: theme lasts for this page */ }
+      syncThemeBtn();
+      document.dispatchEvent(new CustomEvent('themechange'));
+    });
+    systemDark.addEventListener('change', syncThemeBtn);
+    syncThemeBtn();
+  }
+
   // Mobile nav
   const toggle = document.querySelector('.nav-toggle');
   const links = document.querySelector('.nav-links');

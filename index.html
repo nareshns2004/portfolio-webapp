@@ -18,7 +18,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@naresh_swe24">
 <meta name="twitter:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
-<meta name="theme-color" content="#0a0c10">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -41,7 +43,7 @@
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/home.css">
 </head>
@@ -51,7 +53,6 @@
 <nav class="nav" aria-label="Primary">
   <div class="nav-inner">
     <a class="nav-brand" href="#top">naresh<span>.</span>infra</a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="#work">Work</a></li>
       <li><a href="#writing">Writing</a></li>
@@ -60,7 +61,11 @@
       <li><a href="#profiles">Profiles</a></li>
       <li><a href="#contact">Contact</a></li>
     </ul>
-    <a class="nav-status" href="#contact"><span class="status-dot"></span>Open to roles</a>
+    <div class="nav-right">
+      <a class="nav-status" href="#contact"><span class="status-dot"></span>Open to roles</a>
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
   </div>
 </nav>
 
@@ -312,17 +317,17 @@
 
   <p class="profile-label">Technical proof of work</p>
   <div class="profiles-primary">
-    <a class="card profile reveal" href="https://github.com/nareshns2004" target="_blank" rel="noopener" style="--pc:#e6edf5">
+    <a class="card profile reveal" href="https://github.com/nareshns2004" target="_blank" rel="noopener" style="--pc:var(--ink)">
       <div class="profile-top"><div class="profile-badge">GH</div><div><div class="profile-name">GitHub</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">goodput, kvwire, nicprof, kptk and the rest of the source behind this page.</p>
       <span class="profile-cta">View repositories ↗</span>
     </a>
-    <a class="card profile reveal" href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener" style="--pc:#fbbf24">
+    <a class="card profile reveal" href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener" style="--pc:var(--copper)">
       <div class="profile-top"><div class="profile-badge">HF</div><div><div class="profile-name">Hugging Face</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">Root-cause and failure-prediction models for NCCL, GPU and network incidents, plus inference Spaces.</p>
       <span class="profile-cta">Browse models ↗</span>
     </a>
-    <a class="card profile reveal" href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener" style="--pc:#fb923c">
+    <a class="card profile reveal" href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener" style="--pc:var(--signal)">
       <div class="profile-top"><div class="profile-badge">LC</div><div><div class="profile-name">LeetCode</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">Algorithms and data-structures practice.</p>
       <span class="profile-cta">View profile ↗</span>

@@ -13,11 +13,13 @@
 <meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/kv-cache-transfer.html">
 <meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0a0c10">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="icon" href="../favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css">
 <link rel="stylesheet" href="../assets/css/post.css">
 <style>
@@ -28,7 +30,7 @@
   .tl-prefill { fill: var(--accent); }
   .tl-xfer { fill: var(--accent2); }
   .tl-exposed { fill: var(--bad); }
-  .tl-layer { stroke: #0a0c10; stroke-width: 0.6; }
+  .tl-layer { stroke: var(--paper); stroke-width: 0.6; }
   .kv-table td.num, .kv-table th.num { text-align: right; font-family: var(--font-mono); }
   .kv-table tr.sel td { color: var(--accent2); }
   .bar-cell { width: 35%; }
@@ -43,12 +45,15 @@
 <nav class="nav" aria-label="Primary">
   <div class="nav-inner">
     <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="../index.html#work">Work</a></li>
       <li><a href="../index.html#writing">Writing</a></li>
       <li><a href="../index.html#contact">Contact</a></li>
     </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
   </div>
 </nav>
 
