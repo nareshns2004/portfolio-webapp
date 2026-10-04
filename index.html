@@ -100,41 +100,15 @@
   </div>
 
   <div class="hero-viz">
-    <figure>
-      <svg viewBox="0 0 400 400" role="img" aria-labelledby="ring-title ring-desc">
-        <title id="ring-title">Ring all-reduce losing a link and recovering</title>
-        <desc id="ring-desc">Eight GPUs pass gradient chunks around a ring. The link between GPU 2 and GPU 3 fails, every rank stalls on the collective, and the job resumes from a checkpoint.</desc>
-        <g>
-          <line class="ring-link" x1="200" y1="60" x2="299" y2="101"/>
-          <line class="ring-link" x1="299" y1="101" x2="340" y2="200"/>
-          <line class="ring-link flaky" x1="340" y1="200" x2="299" y2="299"/>
-          <line class="ring-link" x1="299" y1="299" x2="200" y2="340"/>
-          <line class="ring-link" x1="200" y1="340" x2="101" y2="299"/>
-          <line class="ring-link" x1="101" y1="299" x2="60" y2="200"/>
-          <line class="ring-link" x1="60" y1="200" x2="101" y2="101"/>
-          <line class="ring-link" x1="101" y1="101" x2="200" y2="60"/>
-        </g>
-        <g class="ring-packets">
-          <circle cx="251" cy="77" r="4"/><circle cx="323" cy="149" r="4"/>
-          <circle cx="323" cy="251" r="4"/><circle cx="251" cy="323" r="4"/>
-          <circle cx="149" cy="323" r="4"/><circle cx="77" cy="251" r="4"/>
-          <circle cx="77" cy="149" r="4"/><circle cx="149" cy="77" r="4"/>
-        </g>
-        <g class="ring-node"><rect x="178" y="46" width="44" height="28" rx="5"/><text x="200" y="64">GPU0</text></g>
-        <g class="ring-node"><rect x="277" y="87" width="44" height="28" rx="5"/><text x="299" y="105">GPU1</text></g>
-        <g class="ring-node"><rect x="318" y="186" width="44" height="28" rx="5"/><text x="340" y="204">GPU2</text></g>
-        <g class="ring-node"><rect x="277" y="285" width="44" height="28" rx="5"/><text x="299" y="303">GPU3</text></g>
-        <g class="ring-node"><rect x="178" y="326" width="44" height="28" rx="5"/><text x="200" y="344">GPU4</text></g>
-        <g class="ring-node"><rect x="79" y="285" width="44" height="28" rx="5"/><text x="101" y="303">GPU5</text></g>
-        <g class="ring-node"><rect x="38" y="186" width="44" height="28" rx="5"/><text x="60" y="204">GPU6</text></g>
-        <g class="ring-node"><rect x="79" y="87" width="44" height="28" rx="5"/><text x="101" y="105">GPU7</text></g>
-        <text class="ring-center" x="200" y="180">ring all-reduce</text>
-        <text class="ring-label l1" x="200" y="210">link 2→3 down</text>
-        <text class="ring-label l2" x="200" y="210">all 8 ranks: timeout</text>
-        <text class="ring-label l3" x="200" y="210">resumed from checkpoint</text>
+    <figure class="fig">
+      <figcaption class="fig-bar"><span>Fig. 0 · Ring all-reduce under failure</span><span>8 GPUs</span></figcaption>
+      <svg id="hero-fig" viewBox="0 0 440 390" role="img" aria-labelledby="hero-fig-title hero-fig-desc">
+        <title id="hero-fig-title">Ring all-reduce losing a link and recovering</title>
+        <desc id="hero-fig-desc">Eight GPUs pass gradient chunks around a ring. The link between GPU 2 and GPU 3 fails, the stall spreads around the ring, every rank times out, and the job restores from a checkpoint onto a spare GPU. A goodput timeline shows productive time in blue, stalled time hatched and restart time in red.</desc>
       </svg>
-      <figcaption>One link fails, every rank stalls. <a href="posts/ring-allreduce-failure.html">Break it yourself →</a></figcaption>
+      <noscript><p class="fig-note">One link fails, every rank stalls, and the job restarts from a checkpoint.</p></noscript>
     </figure>
+    <p class="fig-note">Every second the bar isn’t blue is lost goodput. <a href="posts/ring-allreduce-failure.html">Break the ring yourself →</a></p>
   </div>
 </header>
 
@@ -374,5 +348,6 @@
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/site.js"></script>
+<script src="assets/js/hero.js"></script>
 </body>
 </html>

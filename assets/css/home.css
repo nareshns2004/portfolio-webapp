@@ -35,47 +35,17 @@
 .hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 
 .hero-viz { position: relative; }
-.hero-viz figure { margin: 0; }
-.hero-viz svg { width: 100%; height: auto; display: block; }
-.hero-viz figcaption {
-  font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim);
-  text-align: center; margin-top: 0.5rem;
+.fig { margin: 0; border: 1px solid var(--ink); border-radius: 2px; background: var(--paper); }
+.fig-bar {
+  display: flex; justify-content: space-between; gap: 1rem; padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase;
 }
-.hero-viz figcaption a { color: var(--accent); }
-
-/* ring animation: 12s loop; healthy → link down / ranks stall → restore → healthy */
-.ring-link { stroke: var(--border-bright); stroke-width: 2; }
-.ring-link.flaky { animation: link-fail 12s infinite; }
-.ring-node rect { fill: var(--bg2); stroke: var(--accent); stroke-width: 1.5; animation: node-wait 12s infinite; }
-.ring-node text { fill: var(--text); font: 600 11px var(--font-mono); text-anchor: middle; }
-.ring-packets { transform-origin: 200px 200px; animation: ring-flow 12s infinite linear; }
-.ring-packets circle { fill: var(--accent); }
-.ring-label { font: 12px var(--font-mono); text-anchor: middle; opacity: 0; }
-.ring-label.l1 { fill: var(--bad); animation: show-l1 12s infinite; }
-.ring-label.l2 { fill: var(--warn); animation: show-l2 12s infinite; }
-.ring-label.l3 { fill: var(--ok); animation: show-l3 12s infinite; }
-.ring-center { font: 600 12px var(--font-mono); fill: var(--text-dim); text-anchor: middle; }
-
-@keyframes ring-flow { 0% { rotate: 0deg; } 40% { rotate: 180deg; } 78% { rotate: 180deg; } 100% { rotate: 315deg; } }
-@keyframes link-fail {
-  0%, 40% { stroke: var(--border-bright); stroke-dasharray: none; }
-  41%, 78% { stroke: var(--bad); stroke-dasharray: 5 5; }
-  79%, 100% { stroke: var(--border-bright); stroke-dasharray: none; }
-}
-@keyframes node-wait {
-  0%, 44% { stroke: var(--accent); }
-  45%, 62% { stroke: var(--warn); }
-  63%, 78% { stroke: var(--text-dim); }
-  79%, 100% { stroke: var(--accent); }
-}
-@keyframes show-l1 { 0%, 40% { opacity: 0; } 41%, 52% { opacity: 1; } 53%, 100% { opacity: 0; } }
-@keyframes show-l2 { 0%, 52% { opacity: 0; } 53%, 64% { opacity: 1; } 65%, 100% { opacity: 0; } }
-@keyframes show-l3 { 0%, 64% { opacity: 0; } 65%, 80% { opacity: 1; } 81%, 100% { opacity: 0; } }
-
-@media (prefers-reduced-motion: reduce) {
-  .ring-label.l1 { opacity: 1; }
-  .ring-link.flaky { stroke: var(--bad); stroke-dasharray: 5 5; }
-}
+.fig-bar span:last-child { color: var(--text-dim); }
+.fig svg { width: 100%; height: auto; display: block; padding: 0.5rem; }
+.fig svg text { font-family: var(--font-mono); }
+.fig-note { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); margin-top: 0.6rem; }
+.fig .fig-note { padding: 0 0.75rem 0.75rem; }
 
 /* ─── PROOF STRIP ─── */
 /* a ruled "spec table" row: ink rules top and bottom, hairlines between cells */
