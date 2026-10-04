@@ -7,7 +7,8 @@ Put this file at the repo root as `CLAUDE.md`. Read it fully at the start of eve
 I work on this site in short weekend sessions of **20–30 minutes**. So:
 
 - At the start of a session, read `TODO.md` and propose doing **only the top unchecked item**. If it won't fit in ~25 minutes, split it and do the first half.
-- Every session ends with the site in a deployable state and one commit with a clear message. No half-finished refactors left on main.
+- Every session ends with the site in a deployable state and a clear commit message. No half-finished refactors.
+- **Git workflow:** never commit to `main`. Work on a branch (`feature/<topic>` or `fix/<topic>`), push the branch, and give me the compare link. I open the PR, review the Vercel preview, and merge.
 - At the end of a session, check off what was done in `TODO.md` and write one line under "Next session starts with:".
 - When you need my input, ask one specific question. Don't block on it: leave a `TODO(naresh):` marker and move on.
 - Create `TODO.md` in session 1 from the backlog below if it doesn't exist.
