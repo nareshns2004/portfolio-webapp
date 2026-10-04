@@ -16,9 +16,10 @@ I work on this site in short weekend sessions of **20–30 minutes**. So:
 ## Current state (as of Oct 2026)
 
 - Static site, no build step. **Keep it that way for now.** A framework migration is out of scope unless I ask. Hosted on Vercel at https://portfolio-webapp-roan.vercel.app (canonical + OG URLs use it).
-- `index.html` (homepage), `posts/*.html` (interactive posts), `assets/css/{site,home,post}.css`, `assets/js/{site,post,data}.js`, `og-image.png` (rendered from `assets/og/og-source.html`).
+- `index.html` (homepage), `posts/*.html` (interactive posts), `assets/css/{site,home,post}.css`, `assets/js/{site,post,data,hero}.js`, `og-image.png` (rendered from `assets/og/og-source.html`), `design/visual-refresh-plan.html` (approved design reference, noindex).
 - Homepage sections: hero + proof strip, Work ("Two problems I work on"), Writing (rendered from `assets/js/data.js`), Upstream & evidence, Foundations (skill → artifact map), Profiles, Contact.
-- Fonts: JetBrains Mono (UI/code) + Syne (display); long-form prose uses the system sans stack for readability.
+- Visual system ("datasheet", approved Oct 2026): six named colors in `site.css` (Paper, Ink, Graphite, Signal = reliability/links/running, Copper = efficiency/in progress, Fault = failures only), light default + dark via system setting or nav toggle. IBM Plex Sans + IBM Plex Mono only. Widgets are numbered figures ("Fig. n", CSS counter). Use tokens, never raw hex, in page CSS; set SVG paint via `style` (or `P.svg`) so `var()` works.
+- Hero "Fig. 0" (`hero.js`): ring loses a link → stall spreads → timeout → restore on spare, with a goodput timeline; static frame under reduced motion, paused off-screen.
 
 ## What the site is for
 
@@ -57,7 +58,7 @@ Kernel/eBPF/DPDK/RDMA depth is the *foundation* that makes both stories credible
 7. **First case study page** (`work/training-orchestrator.html`), only once the repo has something runnable. Fixed template: Problem → Why it's hard → Architecture (SVG or Mermaid) → Key decisions and trade-offs rejected → Results with methodology (hardware, topology, baseline, how measured) → What broke → What's next → Links. Link it from the Reliability block.
 8. **Writing index.** Blog cards pull from a small JSON array (title, date, url, tag, summary) so adding a post is a one-line edit. Link out to Substack; don't duplicate content.
 9. **Share preview.** A static Open Graph image (1200×630) and `twitter:card` set to `summary_large_image`.
-10. **Visual refresh (last).** Only after content is done. Propose a design plan first (4–6 named colors, 1–2 typefaces, wireframes, one memorable hero moment drawn from my world, such as a ring all-reduce losing a link and recovering from a checkpoint, kept lightweight and static under reduced motion). Move away from the generic dark-terminal dev look (JetBrains Mono + near-black). Wait for my approval before implementing; split across several sessions.
+10. **Visual refresh (last).** ✅ Done Oct 2026 (see `design/visual-refresh-plan.html`). Only after content is done. Propose a design plan first (4–6 named colors, 1–2 typefaces, wireframes, one memorable hero moment drawn from my world, such as a ring all-reduce losing a link and recovering from a checkpoint, kept lightweight and static under reduced motion). Move away from the generic dark-terminal dev look (JetBrains Mono + near-black). Wait for my approval before implementing; split across several sessions.
 11. **Second case study** (`work/disaggregated-inference.html`) when that project has results.
 
 Next session starts with: see TODO.md.

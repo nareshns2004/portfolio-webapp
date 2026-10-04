@@ -4,9 +4,14 @@ window.P = (function () {
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const SVGNS = 'http://www.w3.org/2000/svg';
 
+  // Paint values containing var() go through style: presentation attributes don't take var() in every browser.
+  const PAINT = new Set(['fill', 'stroke']);
   function svg(tag, attrs = {}, parent) {
     const el = document.createElementNS(SVGNS, tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (PAINT.has(k) && String(v).includes('var(')) el.style.setProperty(k, v);
+      else el.setAttribute(k, v);
+    }
     if (parent) parent.appendChild(el);
     return el;
   }

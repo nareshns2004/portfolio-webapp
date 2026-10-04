@@ -310,7 +310,7 @@
   }
 
   function draw(animate) {
-    svgEl.innerHTML = '<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--paper)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--graphite)" stroke-width="1.6" opacity="0.55"/></pattern></defs>';
+    svgEl.innerHTML = '<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--paper)"/><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--graphite)" stroke-width="1.6" opacity="0.55"/></pattern></defs>';
     // edges
     for (let r = 0; r < N; r++) {
       const [x1, y1] = pos(r), [x2, y2] = pos((r + 1) % N);
