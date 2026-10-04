@@ -22,8 +22,8 @@
 }
 .hero-eyebrow strong { color: var(--text); font-weight: 700; }
 .hero-title {
-  font-family: var(--font-display); font-weight: 800;
-  font-size: clamp(1.9rem, 3.3vw, 2.6rem); line-height: 1.1; letter-spacing: -0.025em;
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(2rem, 3.6vw, 2.75rem); line-height: 1.12; letter-spacing: -0.025em;
   margin-bottom: 1.25rem;
 }
 .hero-title em { font-style: normal; color: var(--accent); }
@@ -78,11 +78,14 @@
 }
 
 /* ─── PROOF STRIP ─── */
+/* a ruled "spec table" row: ink rules top and bottom, hairlines between cells */
 .proof {
-  max-width: var(--max); margin: 1rem auto 0; padding: 0 1.25rem;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+  width: min(calc(100% - 2.5rem), calc(var(--max) - 2.5rem)); margin: 1rem auto 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--rule); border-top: 1.5px solid var(--ink); border-bottom: 1.5px solid var(--ink);
 }
-.proof-item { padding: 1.1rem 1.2rem; }
+.proof .proof-item { padding: 1.1rem 1.2rem; border: 0; border-radius: 0; background: var(--paper); }
+.proof a.proof-item:hover { background: var(--paper-2); }
 .proof-kicker {
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--text-dim); margin-bottom: 0.4rem; display: flex; justify-content: space-between; gap: 0.5rem;
@@ -113,11 +116,11 @@
 /* ─── WRITING ─── */
 .writing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
 .post-card { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.7rem; position: relative; overflow: hidden; }
-.post-card.featured { grid-column: span 1; background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 7%, transparent), var(--bg2) 55%); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
-.post-card.featured:nth-child(2) { background: linear-gradient(160deg, color-mix(in srgb, var(--accent2) 8%, transparent), var(--bg2) 55%); border-color: color-mix(in srgb, var(--accent2) 35%, transparent); }
+.post-card.featured { border-top: 3px solid var(--signal); }
+.post-card.featured.eff { border-top-color: var(--copper); }
 .post-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); }
 .post-kind { margin-left: auto; }
-.post-kind.interactive { color: var(--ok); }
+.post-kind.interactive { color: var(--signal); }
 .post-title { font-family: var(--font-display); font-size: 1.12rem; line-height: 1.3; }
 .post-summary { color: var(--text-mid); font-size: 0.9rem; }
 
@@ -150,11 +153,11 @@ a.profile:hover { border-color: var(--pc); }
 .profile-top { display: flex; align-items: center; gap: 0.8rem; }
 .profile-badge {
   width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;
-  font-family: var(--font-display); font-weight: 800; font-size: 0.9rem; color: var(--pc);
+  font-family: var(--font-mono); font-weight: 600; font-size: 0.85rem; color: var(--pc);
   background: color-mix(in srgb, var(--pc) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--pc) 35%, transparent);
 }
-.profile-name { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; }
+.profile-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
 .profile-handle { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-dim); }
 .profile-desc { color: var(--text-mid); font-size: 0.88rem; flex: 1; }
 .profile-cta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--pc); }
@@ -166,20 +169,19 @@ a.profile:hover { border-color: var(--pc); }
 .social span { color: var(--text-dim); font-size: 0.75rem; }
 
 /* ─── CONTACT ─── */
-.contact { padding: 3rem 2rem; text-align: center; position: relative; overflow: hidden; border-color: var(--border-bright); }
+.contact { padding: 3rem 2rem; text-align: center; position: relative; overflow: hidden; border-color: var(--ink); }
 .contact::before {
   content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background:
-    radial-gradient(ellipse 60% 80% at 15% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 85% 100%, color-mix(in srgb, var(--accent2) 8%, transparent), transparent 70%);
+    linear-gradient(90deg, var(--signal) 0 50%, var(--copper) 50% 100%) top / 100% 3px no-repeat;
 }
 .contact > * { position: relative; }
-.contact h2 { font-family: var(--font-display); font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.15; margin: 1rem 0; }
+.contact h2 { font-family: var(--font-display); font-weight: 600; font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.15; margin: 1rem 0; }
 .contact p { color: var(--text-mid); max-width: 620px; margin: 0 auto 1.5rem; }
 .contact-badge {
   display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono); font-size: 0.72rem;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--ok);
-  border: 1px solid color-mix(in srgb, var(--ok) 35%, transparent); background: color-mix(in srgb, var(--ok) 6%, transparent); padding: 0.25rem 0.9rem; border-radius: 999px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--signal);
+  border: 1px solid color-mix(in srgb, var(--signal) 40%, transparent); background: transparent; padding: 0.25rem 0.9rem; border-radius: 999px;
 }
 .contact-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin-bottom: 2rem; }
 .contact-cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; }
