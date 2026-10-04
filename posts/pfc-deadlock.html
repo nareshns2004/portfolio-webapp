@@ -13,11 +13,13 @@
 <meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/pfc-deadlock.html">
 <meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0a0c10">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="icon" href="../favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css">
 <link rel="stylesheet" href="../assets/css/post.css">
 <style>
@@ -25,14 +27,14 @@
   .sw.dl rect.box { stroke: var(--bad); }
   .sw text.name { fill: var(--text); font-size: 13px; font-weight: 700; }
   .sw text.q { fill: var(--text-dim); font-size: 10px; }
-  .cell { stroke: #0a0c10; stroke-width: 1; }
+  .cell { stroke: var(--paper); stroke-width: 1; }
   .cell.empty { fill: var(--bg3); }
   .cell.transit { fill: var(--accent); }
   .cell.local { fill: var(--accent2); }
   .thr { stroke-width: 1.5; }
   .thr.xoff { stroke: var(--bad); } .thr.kmin { stroke: var(--warn); stroke-dasharray: 2 2; }
   .lnk { stroke-width: 3; fill: none; }
-  .lnk.ok { stroke: var(--ok); } .lnk.paused { stroke: var(--bad); stroke-dasharray: 7 5; } .lnk.off { stroke: var(--border-bright); }
+  .lnk.ok { stroke: var(--signal); } .lnk.paused { stroke: var(--bad); stroke-dasharray: 7 5; } .lnk.off { stroke: var(--border-bright); }
   .lnk-label { font-size: 10px; font-weight: 700; text-anchor: middle; }
   .host { fill: var(--text-dim); font-size: 10px; text-anchor: middle; }
   .banner { font-size: 15px; font-weight: 700; text-anchor: middle; }
@@ -46,12 +48,15 @@
 <nav class="nav" aria-label="Primary">
   <div class="nav-inner">
     <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="../index.html#work">Work</a></li>
       <li><a href="../index.html#writing">Writing</a></li>
       <li><a href="../index.html#contact">Contact</a></li>
     </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
   </div>
 </nav>
 
@@ -104,7 +109,7 @@
     <div class="legend">
       <span><i style="background:var(--accent)"></i>transit packet (needs next link)</span>
       <span><i style="background:var(--accent2)"></i>local packet (exits here)</span>
-      <span><i style="background:var(--ok)"></i>link sending</span>
+      <span><i style="background:var(--signal)"></i>link sending</span>
       <span><i style="background:var(--bad)"></i>link paused</span>
     </div>
     <div class="stats">
@@ -252,7 +257,7 @@
       [[405, 320], [235, 320]], [[170, 282], [170, 158]],
     ];
     const defs = P.svg('defs', {}, svgEl);
-    [['ok', 'var(--ok)'], ['paused', 'var(--bad)'], ['off', 'var(--border-bright)']].forEach(([id, c]) => {
+    [['ok', 'var(--signal)'], ['paused', 'var(--bad)'], ['off', 'var(--border-bright)']].forEach(([id, c]) => {
       const m = P.svg('marker', { id: 'ar-' + id, markerWidth: 8, markerHeight: 8, refX: 6, refY: 4, orient: 'auto' }, defs);
       P.svg('path', { d: 'M0,0 L8,4 L0,8 z', fill: c }, m);
     });

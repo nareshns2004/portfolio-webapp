@@ -13,19 +13,22 @@
 <meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/ring-allreduce-failure.html">
 <meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#0a0c10">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="icon" href="../favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/site.css">
 <link rel="stylesheet" href="../assets/css/post.css">
 <style>
   .rank-node circle { stroke-width: 2; transition: fill 0.25s, stroke 0.25s; }
-  .rank-node.run circle { fill: #0d2a33; stroke: var(--accent); }
-  .rank-node.wait circle { fill: #33290b; stroke: var(--warn); }
-  .rank-node.done circle { fill: #0c2e22; stroke: var(--ok); }
-  .rank-node.dead circle { fill: #3a1414; stroke: var(--bad); }
+  .rank-node.run circle { fill: color-mix(in srgb, var(--signal) 12%, transparent); stroke: var(--signal); }
+  .rank-node.wait circle { fill: url(#hatch); stroke: var(--graphite); stroke-dasharray: 4 3; }
+  .rank-node.done circle { fill: var(--ink); stroke: var(--ink); }
+  .rank-node.done text { fill: var(--paper); }
+  .rank-node.dead circle { fill: color-mix(in srgb, var(--fault) 14%, transparent); stroke: var(--fault); }
   .rank-node text { fill: var(--text); font-size: 12px; font-weight: 700; text-anchor: middle; }
   .rank-step { fill: var(--text-dim); font-size: 10px; text-anchor: middle; }
   .ring-edge { stroke: var(--border-bright); stroke-width: 3; }
@@ -46,12 +49,15 @@
 <nav class="nav" aria-label="Primary">
   <div class="nav-inner">
     <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="../index.html#work">Work</a></li>
       <li><a href="../index.html#writing">Writing</a></li>
       <li><a href="../index.html#contact">Contact</a></li>
     </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
   </div>
 </nav>
 
@@ -132,7 +138,7 @@
     </div>
     <div class="legend">
       <span><i style="background:var(--accent)"></i>running</span>
-      <span><i style="background:var(--warn)"></i>blocked on recv</span>
+      <span><i style="background:repeating-linear-gradient(45deg,var(--graphite) 0 2px,transparent 2px 5px);border:1px dashed var(--graphite)"></i>blocked on recv</span>
       <span><i style="background:var(--bad)"></i>watchdog timeout</span>
       <span><i style="background:var(--ok)"></i>collective done</span>
     </div>
@@ -304,7 +310,7 @@
   }
 
   function draw(animate) {
-    svgEl.innerHTML = '';
+    svgEl.innerHTML = '<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" style="fill:var(--paper)"/><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--graphite)" stroke-width="1.6" opacity="0.55"/></pattern></defs>';
     // edges
     for (let r = 0; r < N; r++) {
       const [x1, y1] = pos(r), [x2, y2] = pos((r + 1) % N);

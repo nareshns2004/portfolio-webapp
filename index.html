@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/">
 <meta property="og:title" content="Naresh Kumar — GPU Cluster Networking &amp; Training Infrastructure">
-<meta property="og:description" content="Making GPU clusters lose less time to failures and less time moving bytes. Repos, models and interactive write-ups.">
+<meta property="og:description" content="A GPU cluster is only as fast as its slowest link and as reliable as its weakest. Repos, models and interactive write-ups on making it lose less time to both.">
 <meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -18,7 +18,9 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:site" content="@naresh_swe24">
 <meta name="twitter:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
-<meta name="theme-color" content="#0a0c10">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -41,7 +43,7 @@
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/site.css">
 <link rel="stylesheet" href="assets/css/home.css">
 </head>
@@ -51,7 +53,6 @@
 <nav class="nav" aria-label="Primary">
   <div class="nav-inner">
     <a class="nav-brand" href="#top">naresh<span>.</span>infra</a>
-    <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
     <ul class="nav-links" id="nav-links">
       <li><a href="#work">Work</a></li>
       <li><a href="#writing">Writing</a></li>
@@ -60,23 +61,22 @@
       <li><a href="#profiles">Profiles</a></li>
       <li><a href="#contact">Contact</a></li>
     </ul>
-    <a class="nav-status" href="#contact"><span class="status-dot"></span>Open to roles</a>
+    <div class="nav-right">
+      <a class="nav-status" href="#contact"><span class="status-dot"></span>Open to roles</a>
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
   </div>
 </nav>
 
 <main id="main">
 
 <!-- HERO -->
-<!--
-  TODO(naresh): pick the hero line (CLAUDE.md item 2). Current choice is A.
-    A) "I make GPU clusters lose less time to failures and less time moving bytes."
-    B) "When one link fails, a 512-GPU job stops. I build the infrastructure that finds it and gets training back fast."
-    C) "A GPU cluster is as fast as its slowest link and as reliable as its weakest one. I work on both."
--->
+<!-- Hero line: blend of options A + C, chosen by Naresh (Oct 2026). -->
 <header class="hero" id="top">
   <div>
     <p class="hero-eyebrow"><strong>Naresh Kumar</strong> · GPU cluster networking &amp; distributed-training infrastructure</p>
-    <h1 class="hero-title">I make GPU clusters lose less time to <em>failures</em> and less time <em class="alt">moving bytes</em>.</h1>
+    <h1 class="hero-title">A GPU cluster is only as fast as its <em class="alt">slowest link</em> and as reliable as its <em>weakest</em>. I make it lose less time to both.</h1>
     <p class="hero-bio">
       <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">~9 years</a> below the framework layer:
       kernel networking, RDMA/RoCE, DPDK, SR-IOV, KVM and NCCL. Now applying it to the two problems that
@@ -100,41 +100,15 @@
   </div>
 
   <div class="hero-viz">
-    <figure>
-      <svg viewBox="0 0 400 400" role="img" aria-labelledby="ring-title ring-desc">
-        <title id="ring-title">Ring all-reduce losing a link and recovering</title>
-        <desc id="ring-desc">Eight GPUs pass gradient chunks around a ring. The link between GPU 2 and GPU 3 fails, every rank stalls on the collective, and the job resumes from a checkpoint.</desc>
-        <g>
-          <line class="ring-link" x1="200" y1="60" x2="299" y2="101"/>
-          <line class="ring-link" x1="299" y1="101" x2="340" y2="200"/>
-          <line class="ring-link flaky" x1="340" y1="200" x2="299" y2="299"/>
-          <line class="ring-link" x1="299" y1="299" x2="200" y2="340"/>
-          <line class="ring-link" x1="200" y1="340" x2="101" y2="299"/>
-          <line class="ring-link" x1="101" y1="299" x2="60" y2="200"/>
-          <line class="ring-link" x1="60" y1="200" x2="101" y2="101"/>
-          <line class="ring-link" x1="101" y1="101" x2="200" y2="60"/>
-        </g>
-        <g class="ring-packets">
-          <circle cx="251" cy="77" r="4"/><circle cx="323" cy="149" r="4"/>
-          <circle cx="323" cy="251" r="4"/><circle cx="251" cy="323" r="4"/>
-          <circle cx="149" cy="323" r="4"/><circle cx="77" cy="251" r="4"/>
-          <circle cx="77" cy="149" r="4"/><circle cx="149" cy="77" r="4"/>
-        </g>
-        <g class="ring-node"><rect x="178" y="46" width="44" height="28" rx="5"/><text x="200" y="64">GPU0</text></g>
-        <g class="ring-node"><rect x="277" y="87" width="44" height="28" rx="5"/><text x="299" y="105">GPU1</text></g>
-        <g class="ring-node"><rect x="318" y="186" width="44" height="28" rx="5"/><text x="340" y="204">GPU2</text></g>
-        <g class="ring-node"><rect x="277" y="285" width="44" height="28" rx="5"/><text x="299" y="303">GPU3</text></g>
-        <g class="ring-node"><rect x="178" y="326" width="44" height="28" rx="5"/><text x="200" y="344">GPU4</text></g>
-        <g class="ring-node"><rect x="79" y="285" width="44" height="28" rx="5"/><text x="101" y="303">GPU5</text></g>
-        <g class="ring-node"><rect x="38" y="186" width="44" height="28" rx="5"/><text x="60" y="204">GPU6</text></g>
-        <g class="ring-node"><rect x="79" y="87" width="44" height="28" rx="5"/><text x="101" y="105">GPU7</text></g>
-        <text class="ring-center" x="200" y="180">ring all-reduce</text>
-        <text class="ring-label l1" x="200" y="210">link 2→3 down</text>
-        <text class="ring-label l2" x="200" y="210">all 8 ranks: timeout</text>
-        <text class="ring-label l3" x="200" y="210">resumed from checkpoint</text>
+    <figure class="fig">
+      <figcaption class="fig-bar"><span>Fig. 0 · Ring all-reduce under failure</span><span>8 GPUs</span></figcaption>
+      <svg id="hero-fig" viewBox="0 0 440 390" role="img" aria-labelledby="hero-fig-title hero-fig-desc">
+        <title id="hero-fig-title">Ring all-reduce losing a link and recovering</title>
+        <desc id="hero-fig-desc">Eight GPUs pass gradient chunks around a ring. The link between GPU 2 and GPU 3 fails, the stall spreads around the ring, every rank times out, and the job restores from a checkpoint onto a spare GPU. A goodput timeline shows productive time in blue, stalled time hatched and restart time in red.</desc>
       </svg>
-      <figcaption>One link fails, every rank stalls. <a href="posts/ring-allreduce-failure.html">Break it yourself →</a></figcaption>
+      <noscript><p class="fig-note">One link fails, every rank stalls, and the job restarts from a checkpoint.</p></noscript>
     </figure>
+    <p class="fig-note">Every second the bar isn’t blue is lost goodput. <a href="posts/ring-allreduce-failure.html">Break the ring yourself →</a></p>
   </div>
 </header>
 
@@ -317,17 +291,17 @@
 
   <p class="profile-label">Technical proof of work</p>
   <div class="profiles-primary">
-    <a class="card profile reveal" href="https://github.com/nareshns2004" target="_blank" rel="noopener" style="--pc:#e6edf5">
+    <a class="card profile reveal" href="https://github.com/nareshns2004" target="_blank" rel="noopener" style="--pc:var(--ink)">
       <div class="profile-top"><div class="profile-badge">GH</div><div><div class="profile-name">GitHub</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">goodput, kvwire, nicprof, kptk and the rest of the source behind this page.</p>
       <span class="profile-cta">View repositories ↗</span>
     </a>
-    <a class="card profile reveal" href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener" style="--pc:#fbbf24">
+    <a class="card profile reveal" href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener" style="--pc:var(--copper)">
       <div class="profile-top"><div class="profile-badge">HF</div><div><div class="profile-name">Hugging Face</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">Root-cause and failure-prediction models for NCCL, GPU and network incidents, plus inference Spaces.</p>
       <span class="profile-cta">Browse models ↗</span>
     </a>
-    <a class="card profile reveal" href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener" style="--pc:#fb923c">
+    <a class="card profile reveal" href="https://leetcode.com/u/nareshns2004/" target="_blank" rel="noopener" style="--pc:var(--signal)">
       <div class="profile-top"><div class="profile-badge">LC</div><div><div class="profile-name">LeetCode</div><div class="profile-handle">@nareshns2004</div></div></div>
       <p class="profile-desc">Algorithms and data-structures practice.</p>
       <span class="profile-cta">View profile ↗</span>
@@ -374,5 +348,6 @@
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/site.js"></script>
+<script src="assets/js/hero.js"></script>
 </body>
 </html>
