@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Visual refresh plan — naresh.infra</title>
+<meta name="description" content="Design proposal for the portfolio visual refresh: palette, type, wireframes and the hero moment. For review before implementation.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Proposed tokens (light default, dark via system or toggle) ── */
+  :root {
+    --paper: #F7F5F0; --paper-2: #EFECE4; --rule: #D9D4C7;
+    --ink: #15171C; --graphite: #555C6A;
+    --signal: #1D4ED8; --copper: #B4470E; --fault: #C2261D;
+    --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #10151D; --paper-2: #171E29; --rule: #2A3341;
+      --ink: #ECE8E0; --graphite: #A3ABB8;
+      --signal: #86A8FF; --copper: #F0935C; --fault: #FF7D73;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #10151D; --paper-2: #171E29; --rule: #2A3341;
+    --ink: #ECE8E0; --graphite: #A3ABB8;
+    --signal: #86A8FF; --copper: #F0935C; --fault: #FF7D73;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--font-sans); -webkit-font-smoothing: antialiased; }
+  a { color: var(--signal); text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header.top { border-bottom: 1px solid var(--rule); }
+  header.top .wrap { display: flex; justify-content: space-between; align-items: center; height: 60px; gap: 1rem; }
+  .brand { font: 600 15px var(--font-mono); letter-spacing: -0.01em; }
+  .brand span { color: var(--signal); }
+  .theme-btn { font: 500 13px var(--font-mono); background: none; color: var(--ink); border: 1px solid var(--rule); border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+  .eyebrow { font: 500 12px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--graphite); }
+  .fig-label { font: 500 12px var(--font-mono); color: var(--graphite); }
+  h1 { font-weight: 600; font-size: clamp(2rem, 4.5vw, 2.9rem); line-height: 1.12; letter-spacing: -0.02em; margin: 0.6rem 0 1rem; }
+  h2 { font-weight: 600; font-size: 1.65rem; letter-spacing: -0.015em; line-height: 1.2; margin-bottom: 0.4rem; }
+  h3 { font-weight: 600; font-size: 1.1rem; margin: 1.4rem 0 0.4rem; }
+  p { margin-bottom: 0.9rem; max-width: 70ch; }
+  .lede { font-size: 1.15rem; color: var(--graphite); max-width: 62ch; }
+  section { padding: 3.5rem 0; border-bottom: 1px solid var(--rule); }
+  section > .wrap > .eyebrow { display: block; margin-bottom: 0.4rem; }
+  code, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+  ul.clean { list-style: none; }
+  ul.dash li { margin: 0 0 0.45rem 1.1rem; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  @media (max-width: 760px) { .grid2, .grid3 { grid-template-columns: 1fr; } }
+
+  /* compare */
+  .cmp { border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .cmp-h { font: 500 12px var(--font-mono); padding: 8px 12px; border-bottom: 1px solid var(--rule); background: var(--paper-2); color: var(--graphite); }
+  .cmp-b { padding: 16px; }
+  .old { background: #0a0c10; color: #e6edf5; font-family: 'JetBrains Mono', monospace; }
+
+  /* palette */
+  .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
+  @media (max-width: 760px) { .swatches { grid-template-columns: 1fr 1fr; } }
+  .sw { border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; background: var(--paper); }
+  .sw-chip { height: 76px; display: flex; }
+  .sw-chip div { flex: 1; display: flex; align-items: flex-end; padding: 6px 8px; font: 500 11px var(--font-mono); }
+  .sw-body { padding: 10px 12px 12px; }
+  .sw-name { font-weight: 600; }
+  .sw-role { font-size: 0.85rem; color: var(--graphite); }
+  .sw-meta { font: 400 11.5px var(--font-mono); color: var(--graphite); margin-top: 4px; }
+
+  /* type */
+  .specimen { border-top: 1px solid var(--rule); padding: 14px 0; display: grid; grid-template-columns: 170px 1fr; gap: 1rem; align-items: baseline; }
+  @media (max-width: 760px) { .specimen { grid-template-columns: 1fr; gap: 0.2rem; } }
+
+  /* hero prototype */
+  .hero-proto { display: grid; grid-template-columns: 1.1fr 1fr; gap: 2rem; align-items: center; border: 1px solid var(--rule); border-radius: 8px; padding: 28px; background: var(--paper); }
+  @media (max-width: 860px) { .hero-proto { grid-template-columns: 1fr; } }
+  .hero-proto h1 { font-size: clamp(1.7rem, 3.4vw, 2.3rem); }
+  .hero-proto h1 .s { color: var(--copper); }
+  .hero-proto h1 .r { color: var(--signal); }
+  .proto-svg { width: 100%; height: auto; display: block; }
+  .proto-svg text { font-family: var(--font-mono); }
+  .storyboard { display: none; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .storyboard figure { margin: 0; }
+  .storyboard figcaption { font: 500 12px var(--font-mono); color: var(--graphite); text-align: center; margin-top: 4px; }
+  .btn { display: inline-block; font: 600 14px var(--font-sans); padding: 10px 16px; border-radius: 4px; text-decoration: none; }
+  .btn-ink { background: var(--ink); color: var(--paper); }
+  .btn-line { border: 1px solid var(--ink); color: var(--ink); }
+  .tag { display: inline-block; font: 500 12px var(--font-mono); border: 1px solid var(--rule); border-radius: 3px; padding: 2px 8px; margin: 0 4px 6px 0; color: var(--ink); }
+
+  /* components */
+  .card { border: 1px solid var(--rule); border-radius: 6px; padding: 18px; background: var(--paper); }
+  .card .k { font: 500 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--graphite); }
+  .card .t { font-weight: 600; font-size: 1.05rem; margin: 6px 0; }
+  .rule-top-signal { border-top: 3px solid var(--signal); }
+  .rule-top-copper { border-top: 3px solid var(--copper); }
+  .status { font: 500 11.5px var(--font-mono); display: inline-flex; gap: 6px; align-items: center; }
+  .status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .widget-frame { border: 1px solid var(--ink); border-radius: 2px; }
+  .widget-frame .bar { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--ink); font: 500 12px var(--font-mono); }
+  .widget-frame .body { padding: 14px; }
+
+  /* wireframes */
+  .wf { width: 100%; height: auto; display: block; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper-2); }
+  .wf text { font-family: var(--font-mono); }
+
+  table.plan { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  table.plan th, table.plan td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  table.plan th { font: 500 12px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--graphite); }
+  .decide { border: 2px solid var(--signal); border-radius: 8px; padding: 20px 22px; }
+  .decide ol { margin-left: 1.2rem; }
+  .decide li { margin-bottom: 0.6rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-anim { display: none; }
+    .storyboard { display: grid; }
+  }
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <span class="brand">naresh<span>.</span>infra / design</span>
+  <button class="theme-btn" id="theme">Toggle light / dark</button>
+</div></header>
+
+<main>
+<section><div class="wrap">
+  <span class="eyebrow">Proposal · backlog item 10 · for review</span>
+  <h1>Visual refresh: the “datasheet” direction</h1>
+  <p class="lede">The content now carries the site. This plan changes how it looks: away from the generic dark-terminal template and toward something that reads like a well-made engineering datasheet or paper figure. Nothing ships until you approve it.</p>
+  <p>This page is itself styled in the proposed system. Use the toggle (top right) to see dark mode. With reduced motion turned on, the hero animation becomes a static three-panel storyboard.</p>
+
+  <div class="grid2" style="margin-top:1.5rem">
+    <div class="cmp"><div class="cmp-h">Now: dark terminal</div>
+      <div class="cmp-b old">
+        <div style="font-size:11px;color:#8593a6;letter-spacing:.1em">KERNEL · NETWORKS · AI/ML</div>
+        <div style="font:800 26px Syne, sans-serif;margin:6px 0;line-height:1.1">Near-black, neon cyan, mono everywhere</div>
+        <div style="font-size:12px;color:#b4c0cf">Reads as “dev portfolio template”. Every second infra portfolio looks like this.</div>
+      </div></div>
+    <div class="cmp"><div class="cmp-h">Proposed: datasheet</div>
+      <div class="cmp-b">
+        <div class="eyebrow">GPU cluster networking · training infra</div>
+        <div style="font-weight:600;font-size:26px;margin:6px 0;line-height:1.15;letter-spacing:-.02em">Warm paper, ink, one signal color per story</div>
+        <div style="font-size:14px;color:var(--graphite)">Reads as “engineer who documents things properly”. Diagrams look like figures in a paper, which is what they are.</div>
+      </div></div>
+  </div>
+
+  <h3>Principles</h3>
+  <ul class="dash">
+    <li><strong>Color means something.</strong> Signal blue = reliability and links. Copper = efficiency. Fault red = failures only. No decorative gradients or glow.</li>
+    <li><strong>Diagrams are the visual identity.</strong> The ring, the fabric and the timelines look like figures: thin ink strokes, mono labels, hatching instead of glow for “waiting”.</li>
+    <li><strong>Type does the hierarchy.</strong> One sans family for everything you read, its mono sibling for anything you’d copy or measure.</li>
+    <li><strong>Light by default, honest dark mode.</strong> Dark follows the system setting (with a toggle) and uses deep slate, not terminal black.</li>
+  </ul>
+</div></section>
+
+<!-- PALETTE -->
+<section><div class="wrap">
+  <span class="eyebrow">1 · Palette</span>
+  <h2>Six named colors</h2>
+  <p>Each has a light and dark value. Contrast is measured against Paper in the same theme; all text uses pass WCAG AA (≥ 4.5:1).</p>
+  <div class="swatches" id="swatches"></div>
+  <p style="margin-top:1rem;font-size:.92rem;color:var(--graphite)">Widget states use the same six: running = Signal, waiting = Graphite hatching, failed = Fault, done = solid Ink. Amber and green are dropped. Fewer colors make each one mean more.</p>
+</div></section>
+
+<!-- TYPE -->
+<section><div class="wrap">
+  <span class="eyebrow">2 · Typography</span>
+  <h2>IBM Plex Sans + IBM Plex Mono</h2>
+  <p>One superfamily, two cuts. Plex was drawn for engineering documentation: legible at small sizes, with a mono whose numerals line up in tables and widgets. It replaces Syne (display), JetBrains Mono (UI) and the system sans (prose), so we go from three families to two.</p>
+  <div class="specimen"><span class="fig-label">Display · Sans 600 · 44/1.1</span><span style="font-weight:600;font-size:44px;line-height:1.1;letter-spacing:-.02em">Slowest link, weakest link</span></div>
+  <div class="specimen"><span class="fig-label">H2 · Sans 600 · 28</span><span style="font-weight:600;font-size:28px;letter-spacing:-.015em">Two problems I work on</span></div>
+  <div class="specimen"><span class="fig-label">Body · Sans 400 · 17/1.6</span><span>Symptoms are global and causes are local. Stock tooling detects in minutes, attributes nothing, and restarts the whole job.</span></div>
+  <div class="specimen"><span class="fig-label">Label · Mono 500 · 12 caps</span><span class="eyebrow">Reliability at scale · M1 of 6</span></div>
+  <div class="specimen"><span class="fig-label">Data · Mono 400 · 15</span><span class="mono" style="font-size:15px">T ≈ 2(N−1)·α + 2(N−1)/N · S/B &nbsp;→&nbsp; 15.8 ms · 33.9 GB/s</span></div>
+</div></section>
+
+<!-- HERO MOMENT -->
+<section><div class="wrap">
+  <span class="eyebrow">3 · The hero moment</span>
+  <h2>A ring loses a link, and the goodput bar shows what it costs</h2>
+  <p>A figure, not a decoration. Eight GPUs run ring all-reduce and the timeline below fills with blue (productive time). Then link 2→3 fails: the stall spreads one hop at a time (hatching), every rank times out, the job restores from a checkpoint onto a spare, and the ring resumes. The bar keeps the red and grey segments. That is the headline, drawn.</p>
+
+  <div class="hero-proto" style="margin-top:1.25rem">
+    <div>
+      <div class="eyebrow">Naresh Kumar · GPU cluster networking &amp; training infrastructure</div>
+      <h1>A GPU cluster is only as fast as its <span class="s">slowest link</span> and as reliable as its <span class="r">weakest</span>. I make it lose less time to both.</h1>
+      <div style="margin:0 0 1rem"><span class="tag">GPU cluster networking</span><span class="tag">Distributed training</span><span class="tag">NCCL</span><span class="tag">RDMA / RoCE</span></div>
+      <a class="btn btn-ink" href="#">See the work →</a> &nbsp;<a class="btn btn-line" href="#">Break the ring yourself</a>
+    </div>
+    <div>
+      <div class="hero-anim">
+        <svg class="proto-svg" id="proto" viewBox="0 0 440 400" role="img" aria-label="Animated ring all-reduce: a link fails, ranks stall, the job restores from a checkpoint onto a spare GPU and resumes. A timeline bar shows productive, stalled and restart time."></svg>
+      </div>
+      <div class="storyboard" aria-label="Storyboard of the hero animation">
+        <figure><svg class="proto-svg" data-frame="flow" viewBox="0 0 440 400"></svg><figcaption>1 · healthy ring</figcaption></figure>
+        <figure><svg class="proto-svg" data-frame="stall" viewBox="0 0 440 400"></svg><figcaption>2 · link fails, all stall</figcaption></figure>
+        <figure><svg class="proto-svg" data-frame="resume" viewBox="0 0 440 400"></svg><figcaption>3 · restored on spare</figcaption></figure>
+      </div>
+    </div>
+  </div>
+  <p style="margin-top:1rem;font-size:.92rem;color:var(--graphite)">Budget: inline SVG plus about 120 lines of JS, no libraries, nothing rendered off-screen, paused when the tab is hidden. Under <code>prefers-reduced-motion</code> it becomes the three static frames.</p>
+</div></section>
+
+<!-- COMPONENTS -->
+<section><div class="wrap">
+  <span class="eyebrow">4 · Components</span>
+  <h2>How existing pieces change</h2>
+  <div class="grid3" style="margin-top:1rem">
+    <div class="card rule-top-signal">
+      <div class="k">Reliability at scale</div>
+      <div class="t">goodput</div>
+      <div style="font-size:.92rem;color:var(--graphite)">Problem blocks get a 3px top rule in their story color, flat paper, no glow.</div>
+      <div style="margin-top:10px"><span class="status" style="color:var(--copper)">M1 of 6 · in progress</span></div>
+    </div>
+    <div class="card">
+      <div class="k">Repo · runnable</div>
+      <div class="t">nicprof: which NIC counter explains which millisecond</div>
+      <div class="mono" style="font-size:.82rem;color:var(--graphite)">nicprof demo · 69 tests</div>
+    </div>
+    <div class="widget-frame">
+      <div class="bar"><span>FIG. 2 · RING SIMULATOR</span><span style="color:var(--graphite)">interactive</span></div>
+      <div class="body" style="font-size:.9rem">Widgets get a “figure” frame: ink border, numbered caption bar, mono controls. Posts read like a paper with live figures.</div>
+    </div>
+  </div>
+  <ul class="dash" style="margin-top:1.25rem">
+    <li><strong>Buttons:</strong> primary = solid Ink, secondary = Ink outline. No cyan pill.</li>
+    <li><strong>Chips:</strong> hairline Rule border, mono 12px, no fill.</li>
+    <li><strong>Links:</strong> Signal, underlined in prose; arrows (↗) only for external links.</li>
+    <li><strong>Posts:</strong> numbered figures (“Fig. 1”), assumptions box styled as a footnote block, 68ch measure.</li>
+  </ul>
+</div></section>
+
+<!-- WIREFRAMES -->
+<section><div class="wrap">
+  <span class="eyebrow">5 · Wireframes</span>
+  <h2>Layout: same sections, clearer rhythm</h2>
+  <p>Content order stays as it is now. Changes: the hero figure gets more room, the proof strip becomes a ruled “spec table” row, and posts become numbered figures.</p>
+  <div class="grid2" style="margin-top:1rem;align-items:start">
+    <figure>
+      <svg class="wf" viewBox="0 0 480 640" role="img" aria-label="Desktop homepage wireframe">
+        <g fill="none" stroke="var(--graphite)" stroke-width="1">
+          <rect x="16" y="14" width="448" height="22"/>
+          <rect x="16" y="50" width="230" height="160"/><rect x="262" y="50" width="202" height="160"/>
+          <rect x="16" y="222" width="448" height="44"/>
+          <line x1="128" y1="222" x2="128" y2="266"/><line x1="240" y1="222" x2="240" y2="266"/><line x1="352" y1="222" x2="352" y2="266"/>
+          <rect x="16" y="282" width="219" height="120"/><rect x="245" y="282" width="219" height="120"/>
+          <rect x="16" y="418" width="144" height="70"/><rect x="168" y="418" width="144" height="70"/><rect x="320" y="418" width="144" height="70"/>
+          <rect x="16" y="502" width="448" height="56"/>
+          <rect x="16" y="572" width="448" height="50"/>
+        </g>
+        <g fill="var(--signal)" font-size="10">
+          <text x="24" y="29">nav · naresh.infra · Work Writing Evidence Contact · ☾</text>
+          <text x="24" y="70">HERO · headline (2 lines of 3)</text><text x="24" y="86">tags · 2 buttons</text>
+          <text x="270" y="70">FIG. 0 · ring + goodput bar</text>
+          <text x="24" y="240">PROOF · spec-table row</text><text x="24" y="256">4 ruled cells, mono facts</text>
+          <text x="24" y="300">WORK · Reliability</text><text x="253" y="300">WORK · Efficiency</text>
+          <text x="24" y="436">WRITING · figure cards</text>
+          <text x="24" y="520">EVIDENCE + FOUNDATIONS · ruled table</text>
+          <text x="24" y="590">PROFILES · CONTACT · footer</text>
+        </g>
+      </svg>
+      <figcaption class="fig-label" style="margin-top:6px">Desktop · 1040px column</figcaption>
+    </figure>
+    <div class="grid2" style="gap:1rem">
+      <figure>
+        <svg class="wf" viewBox="0 0 200 560" role="img" aria-label="Mobile homepage wireframe">
+          <g fill="none" stroke="var(--graphite)"><rect x="10" y="10" width="180" height="20"/><rect x="10" y="40" width="180" height="110"/><rect x="10" y="158" width="180" height="120"/><rect x="10" y="286" width="180" height="44"/><rect x="10" y="338" width="180" height="90"/><rect x="10" y="436" width="180" height="50"/><rect x="10" y="494" width="180" height="50"/></g>
+          <g fill="var(--signal)" font-size="9"><text x="16" y="24">nav · menu · ☾</text><text x="16" y="58">headline</text><text x="16" y="176">FIG. 0 (full width)</text><text x="16" y="304">proof 2×2</text><text x="16" y="356">work (stacked)</text><text x="16" y="454">writing</text><text x="16" y="512">evidence…</text></g>
+        </svg>
+        <figcaption class="fig-label" style="margin-top:6px">Mobile · 390px</figcaption>
+      </figure>
+      <figure>
+        <svg class="wf" viewBox="0 0 200 560" role="img" aria-label="Post page wireframe">
+          <g fill="none" stroke="var(--graphite)"><rect x="10" y="10" width="180" height="20"/><rect x="24" y="44" width="152" height="60"/><rect x="24" y="112" width="152" height="50"/><rect x="24" y="170" width="152" height="70"/><rect x="10" y="250" width="180" height="140" stroke="var(--ink)"/><rect x="24" y="400" width="152" height="70"/><rect x="24" y="480" width="152" height="60" stroke-dasharray="3 3"/></g>
+          <g fill="var(--signal)" font-size="9"><text x="30" y="62">title · dek</text><text x="30" y="130">TL;DR</text><text x="30" y="188">prose · 68ch</text><text x="16" y="268">FIG. 1 · widget (wider)</text><text x="30" y="418">prose</text><text x="30" y="498">assumptions</text><text x="30" y="512">(footnote)</text></g>
+        </svg>
+        <figcaption class="fig-label" style="margin-top:6px">Post page</figcaption>
+      </figure>
+    </div>
+  </div>
+</div></section>
+
+<!-- PLAN -->
+<section><div class="wrap">
+  <span class="eyebrow">6 · Implementation</span>
+  <h2>Four sessions, each mergeable on its own</h2>
+  <table class="plan">
+    <thead><tr><th>#</th><th>Session (~25 min)</th><th>Scope</th><th>Ships as</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Tokens &amp; type</td><td>New palette + light/dark tokens and theme toggle in <code>site.css</code>; swap fonts to Plex; re-map existing component colors. No layout changes.</td><td><code>feature/refresh-tokens</code></td></tr>
+      <tr><td>2</td><td>Homepage components</td><td>Buttons, chips, cards, proof spec-row, problem blocks, tables, footer, in the datasheet style.</td><td><code>feature/refresh-home</code></td></tr>
+      <tr><td>3</td><td>Hero moment</td><td>Production version of the ring + goodput figure, storyboard fallback, pause when hidden.</td><td><code>feature/refresh-hero</code></td></tr>
+      <tr><td>4</td><td>Posts &amp; share image</td><td>Figure frames, numbered captions and widget colors in all five posts; re-render the OG image in the new style.</td><td><code>feature/refresh-posts</code></td></tr>
+    </tbody>
+  </table>
+  <p style="margin-top:1rem">Each session ends deployable. Before session 1 merges, the Vercel preview is checked in both themes and with reduced motion.</p>
+</div></section>
+
+<section style="border-bottom:0"><div class="wrap">
+  <div class="decide">
+    <span class="eyebrow">Your call</span>
+    <h2 style="margin-top:.3rem">What I need from you</h2>
+    <ol>
+      <li><strong>Direction:</strong> approve “datasheet” (light-first, paper and ink), or ask for a darker variant of the same system.</li>
+      <li><strong>Palette:</strong> OK with Signal blue = reliability and Copper = efficiency? (The current site uses cyan and violet.)</li>
+      <li><strong>Type:</strong> OK to drop Syne and JetBrains Mono for IBM Plex Sans + Mono?</li>
+      <li><strong>Hero:</strong> keep the ring + goodput-bar figure as the one memorable moment?</li>
+    </ol>
+    <p style="margin:0">Reply with approvals or changes, and session 1 starts on a new branch.</p>
+  </div>
+</div></section>
+</main>
+
+<script>
+(function () {
+  const root = document.documentElement;
+  document.getElementById('theme').addEventListener('click', () => {
+    const dark = getComputedStyle(root).colorScheme.includes('dark');
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  // Palette swatches with live contrast against Paper
+  const COLORS = [
+    ['Paper', 'background', '#F7F5F0', '#10151D'],
+    ['Ink', 'text, primary buttons, done', '#15171C', '#ECE8E0'],
+    ['Graphite', 'secondary text, rules, waiting', '#555C6A', '#A3ABB8'],
+    ['Signal', 'reliability, links, running', '#1D4ED8', '#86A8FF'],
+    ['Copper', 'efficiency, in-progress status', '#B4470E', '#F0935C'],
+    ['Fault', 'failures only', '#C2261D', '#FF7D73'],
+  ];
+  const lum = h => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255)
+      .map(c => c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const cr = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return ((x + 0.05) / (y + 0.05)).toFixed(1); };
+  document.getElementById('swatches').innerHTML = COLORS.map(([n, role, l, d]) => `
+    <div class="sw">
+      <div class="sw-chip"><div style="background:${l};color:${lum(l) > 0.4 ? '#15171C' : '#F7F5F0'}">light</div><div style="background:${d};color:${lum(d) > 0.4 ? '#15171C' : '#ECE8E0'}">dark</div></div>
+      <div class="sw-body"><div class="sw-name">${n}</div><div class="sw-role">${role}</div>
+      <div class="sw-meta">${l} · ${d}${n === 'Paper' ? '' : `<br>contrast ${cr(l, '#F7F5F0')} : 1 · ${cr(d, '#10151D')} : 1`}</div></div>
+    </div>`).join('');
+
+  // ── Hero prototype: ring + goodput bar ──
+  const NS = 'http://www.w3.org/2000/svg';
+  const N = 8, CX = 220, CY = 165, R = 120;
+  const pos = i => { const a = -Math.PI / 2 + 2 * Math.PI * i / N; return [CX + R * Math.cos(a), CY + R * Math.sin(a)]; };
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent && parent.appendChild(e); return e; };
+
+  // state: {phase, stalled: Set, spare: bool, linkDown: bool, timeout: bool, packets: t (0..1), bar: [[kind, len]]}
+  function draw(svg, s) {
+    svg.innerHTML = '';
+    const defs = el('defs', {}, svg);
+    const pat = el('pattern', { id: 'hatch-' + svg.id + (svg.dataset.frame || ''), width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--graphite)', 'stroke-width': 2 }, pat);
+    const hatch = `url(#${pat.id})`;
+    for (let i = 0; i < N; i++) {
+      const [x1, y1] = pos(i), [x2, y2] = pos((i + 1) % N);
+      const down = s.linkDown && i === 2;
+      el('line', { x1, y1, x2, y2, stroke: down ? 'var(--fault)' : 'var(--ink)', 'stroke-width': down ? 2 : 1.2, 'stroke-dasharray': down ? '4 4' : '' }, svg);
+      if (down) {
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+        el('path', { d: `M${mx - 7},${my - 7} L${mx + 7},${my + 7} M${mx + 7},${my - 7} L${mx - 7},${my + 7}`, stroke: 'var(--fault)', 'stroke-width': 2.5 }, svg);
+      }
+      if (s.flowing) {   // one packet per link, travelling
+        const t = s.t % 1;
+        el('circle', { cx: x1 + (x2 - x1) * t, cy: y1 + (y2 - y1) * t, r: 3.5, fill: 'var(--signal)' }, svg);
+      }
+    }
+    for (let i = 0; i < N; i++) {
+      const [x, y] = pos(i);
+      const g = el('g', {}, svg);
+      const spare = s.spare && i === 3;
+      el('rect', { x: x - 26, y: y - 15, width: 52, height: 30, rx: 2, fill: 'var(--paper)', stroke: s.timeout ? 'var(--fault)' : 'var(--ink)', 'stroke-width': 1.3, 'stroke-dasharray': spare ? '3 2' : '' }, g);
+      if (s.stalled.has(i)) el('rect', { x: x - 26, y: y - 15, width: 52, height: 30, rx: 2, fill: hatch, opacity: 0.55 }, g);
+      el('text', { x, y: y + 4, 'text-anchor': 'middle', 'font-size': 11, 'font-weight': 600, fill: 'var(--ink)' }, g).textContent = spare ? 'GPU3′' : 'GPU' + i;
+    }
+    el('text', { x: CX, y: CY - 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--graphite)' }, svg).textContent = 'ring all-reduce';
+    el('text', { x: CX, y: CY + 14, 'text-anchor': 'middle', 'font-size': 11.5, 'font-weight': 600, fill: s.labelColor || 'var(--graphite)' }, svg).textContent = s.label || '';
+    // goodput bar
+    const BX = 20, BW = 400, BY = 332;
+    el('text', { x: BX, y: BY - 8, 'font-size': 10.5, fill: 'var(--graphite)' }, svg).textContent = 'GOODPUT TIMELINE';
+    el('rect', { x: BX, y: BY, width: BW, height: 14, fill: 'none', stroke: 'var(--rule)' }, svg);
+    const total = s.bar.reduce((a, [, l]) => a + l, 0) || 1;
+    const scale = Math.min(1, BW / (total * 40));
+    let x = BX;
+    for (const [kind, len] of s.bar) {
+      const w = len * 40 * scale;
+      el('rect', { x, y: BY, width: Math.max(0, w), height: 14, fill: kind === 'ok' ? 'var(--signal)' : kind === 'stall' ? hatch : 'var(--fault)' }, svg);
+      x += w;
+    }
+    const lost = s.bar.filter(([k]) => k !== 'ok').reduce((a, [, l]) => a + l, 0);
+    el('text', { x: BX, y: BY + 32, 'font-size': 10.5, fill: 'var(--graphite)' }, svg).textContent =
+      lost ? 'blue = training · hatched = stalled · red = restart' : 'blue = productive training time';
+  }
+
+  // Storyboard frames (reduced motion)
+  const frames = {
+    flow: { flowing: true, t: 0.5, stalled: new Set(), bar: [['ok', 6]], label: 'all ranks progressing' },
+    stall: { linkDown: true, stalled: new Set([...Array(N).keys()]), timeout: true, bar: [['ok', 6], ['stall', 2.4]], label: 'link 2→3 down · all ranks time out', labelColor: 'var(--fault)' },
+    resume: { flowing: true, t: 0.5, spare: true, stalled: new Set(), bar: [['ok', 6], ['stall', 2.4], ['restart', 1.2], ['ok', 1.4]], label: 'restored from checkpoint on spare' },
+  };
+  document.querySelectorAll('.storyboard svg').forEach(svg => draw(svg, frames[svg.dataset.frame]));
+
+  // Animation
+  const svg = document.getElementById('proto');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const SCRIPT = [['flow', 3.2], ['fail', 0.7], ['spread', 2.2], ['timeout', 1.1], ['restore', 1.6], ['resume', 3.0]];
+  const CYCLE = SCRIPT.reduce((a, [, d]) => a + d, 0);
+  let start = performance.now(), raf = null;
+  function frame(now) {
+    let t = ((now - start) / 1000) % CYCLE, phase = 'flow', pt = 0, acc = 0;
+    for (const [p, d] of SCRIPT) { if (t < acc + d) { phase = p; pt = (t - acc) / d; break; } acc += d; }
+    const cum = (p) => { let a = 0; for (const [q, d] of SCRIPT) { if (q === p) break; a += d; } return a; };
+    const s = { stalled: new Set(), bar: [], t: t * 1.4 };
+    const okBefore = Math.min(t, SCRIPT[0][1] + SCRIPT[1][1]);
+    s.bar.push(['ok', okBefore]);
+    if (phase === 'flow' || phase === 'fail') { s.flowing = phase === 'flow'; s.linkDown = phase === 'fail'; s.label = phase === 'flow' ? 'all ranks progressing' : 'link 2→3 fails'; s.labelColor = phase === 'fail' ? 'var(--fault)' : ''; }
+    if (phase === 'spread' || phase === 'timeout') {
+      s.linkDown = true;
+      const k = phase === 'spread' ? Math.floor(pt * N) + 1 : N;
+      for (let j = 0; j < k; j++) s.stalled.add((3 + j) % N);
+      s.bar.push(['stall', t - cum('spread')]);
+      s.timeout = phase === 'timeout';
+      s.label = phase === 'spread' ? 'stall spreads one hop per step' : 'watchdog: all 8 ranks time out';
+      s.labelColor = phase === 'timeout' ? 'var(--fault)' : '';
+    }
+    if (phase === 'restore' || phase === 'resume') {
+      s.bar.push(['stall', SCRIPT[2][1] + SCRIPT[3][1]]);
+      s.bar.push(['restart', phase === 'restore' ? t - cum('restore') : SCRIPT[4][1]]);
+      s.spare = true;
+      if (phase === 'restore') { s.label = 'drain node · restore checkpoint on spare'; s.stalled = new Set([...Array(N).keys()]); }
+      else { s.flowing = true; s.bar.push(['ok', t - cum('resume')]); s.label = 'training resumed'; }
+    }
+    draw(svg, s);
+    raf = requestAnimationFrame(frame);
+  }
+  function startAnim() { if (!reduce.matches && !document.hidden && !raf) raf = requestAnimationFrame(frame); }
+  function stopAnim() { cancelAnimationFrame(raf); raf = null; }
+  document.addEventListener('visibilitychange', () => document.hidden ? stopAnim() : startAnim());
+  reduce.addEventListener('change', () => reduce.matches ? stopAnim() : startAnim());
+  draw(svg, frames.flow);
+  startAnim();
+})();
+</script>
+</body>
+</html>

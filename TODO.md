@@ -11,7 +11,7 @@ Backlog from CLAUDE.md, ordered by impact.
 - [ ] 7. **First case study page** (`work/training-orchestrator.html`), once goodput has something runnable (M2+).
 - [x] 8. **Writing index.** `assets/js/data.js`; 5 interactive posts + 4 Substack posts.
 - [x] 9. **Share preview.** `og-image.png` (1200×630), `summary_large_image`.
-- [ ] 10. **Visual refresh.** Design plan first; wait for approval. (Hero ring animation is in; palette/typefaces unchanged apart from contrast fixes.)
+- [ ] 10. **Visual refresh.** Plan proposed in `design/visual-refresh-plan.html` ("datasheet": paper/ink, IBM Plex, ring + goodput-bar hero). **Waiting for approval.** Then 4 sessions: tokens & type → homepage components → hero moment → posts & OG image.
 - [ ] 11. **Second case study** (`work/disaggregated-inference.html`) when kvwire has results.
 
 ## New ideas
@@ -28,4 +28,4 @@ Backlog from CLAUDE.md, ordered by impact.
 - **Hugging Face model cards** are empty (license only). Even a short card (task, data, eval) makes the proof strip much stronger.
 - The 5 removed posts (XDP 14 Mpps, DPDK PMD, RDMA, RoCE/PFC, SR-IOV): publish any real drafts on Substack and add them to `data.js`.
 
-Next session starts with: answer the open questions above (links), then item 10's design plan.
+Next session starts with: Naresh's verdict on the design plan, then visual-refresh session 1 (tokens & type) on a new branch.
