@@ -16,8 +16,9 @@ Backlog from CLAUDE.md, ordered by impact.
 
 ## New ideas
 
-- [ ] Post: "The packet path: kernel stack vs XDP vs DPDK vs RDMA" (interactive, foundations story). Link the DPDK Substack essay.
-- [ ] Post: rail-optimized vs fat-tree topology explorer (where NCCL traffic actually goes).
+- [x] Post: "The packet path: kernel stack vs XDP vs DPDK vs RDMA" (`posts/packet-path.html`).
+- [x] Post: rail-optimized vs fat-tree topology explorer (`posts/rail-topology.html`).
+- [x] Site gaps: `robots.txt`, `sitemap.xml` (update when adding a post), custom `404.html`.
 - [ ] When goodput / kvwire publish a first measured result, add it to the proof strip with a link to the run directory.
 
 ## Open questions for Naresh
@@ -28,4 +29,4 @@ Backlog from CLAUDE.md, ordered by impact.
 - **Hugging Face model cards** are empty (license only). Even a short card (task, data, eval) makes the proof strip much stronger.
 - The 5 removed posts (XDP 14 Mpps, DPDK PMD, RDMA, RoCE/PFC, SR-IOV): publish any real drafts on Substack and add them to `data.js`.
 
-Next session starts with: open questions above (vLLM PR link, HF model cards), then the "packet path" interactive post.
+Next session starts with: open questions above (vLLM PR link, HF model cards); then fix the over-claiming READMEs in kernel-level-ai-traffic-shaper and distributed-training-framework-nccl that the site links to.
