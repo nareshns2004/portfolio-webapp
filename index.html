@@ -201,6 +201,8 @@
       <li><a href="posts/pfc-deadlock.html">PFC: the lossless network that can freeze itself</a></li>
       <li><a href="posts/checkpoint-interval.html">How often should a 16K-GPU job checkpoint?</a></li>
       <li><a href="posts/nccl-timeout-triage.html">Reading the crime scene: triaging an NCCL timeout</a></li>
+      <li><a href="posts/packet-path.html">The packet path: kernel stack vs XDP vs DPDK vs RDMA</a></li>
+      <li><a href="posts/rail-topology.html">Where NCCL traffic actually goes: rail-optimized vs fat-tree</a></li>
       <li><a href="https://substack.com/@nareshns2004">Essays on Substack</a></li>
     </ul></noscript>
   </div>
@@ -254,11 +256,13 @@
         <tr><td>Collectives &amp; NCCL</td><td>design + harness</td><td>
           <a href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener">goodput ↗</a>
           <a href="https://github.com/nareshns2004/distributed-training-framework-nccl" target="_blank" rel="noopener">distributed-training-framework-nccl ↗</a>
-          <a href="posts/ring-allreduce-failure.html">ring all-reduce post</a></td></tr>
+          <a href="posts/ring-allreduce-failure.html">ring all-reduce post</a>
+          <a href="posts/rail-topology.html">rail topology post</a></td></tr>
         <tr><td>RDMA / RoCE / PFC</td><td>runnable</td><td>
           <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof ↗</a>
           <a href="https://github.com/nareshns2004/disaggregated-inference-engine" target="_blank" rel="noopener">kvwire ↗</a>
-          <a href="posts/pfc-deadlock.html">PFC deadlock post</a></td></tr>
+          <a href="posts/pfc-deadlock.html">PFC deadlock post</a>
+          <a href="posts/packet-path.html">packet path post</a></td></tr>
         <tr><td>Linux kernel performance</td><td>runnable</td><td>
           <a href="https://github.com/nareshns2004/kernel-performance-toolkit" target="_blank" rel="noopener">kptk ↗</a></td></tr>
         <tr><td>Inference serving</td><td>early</td><td>
@@ -268,9 +272,11 @@
         <tr><td>GPU kernels (CUDA / Triton)</td><td>early</td><td>
           <a href="https://github.com/nareshns2004/custom-cuda-fused-attention-triton" target="_blank" rel="noopener">custom-cuda-fused-attention-triton ↗</a></td></tr>
         <tr><td>eBPF / XDP / tc</td><td>early</td><td>
-          <a href="https://github.com/nareshns2004/kernel-level-ai-traffic-shaper" target="_blank" rel="noopener">kernel-level-ai-traffic-shaper ↗</a></td></tr>
+          <a href="https://github.com/nareshns2004/kernel-level-ai-traffic-shaper" target="_blank" rel="noopener">kernel-level-ai-traffic-shaper ↗</a>
+          <a href="posts/packet-path.html">packet path post</a></td></tr>
         <tr><td>DPDK</td><td>write-up</td><td>
-          <a href="https://nareshns2004.substack.com/p/intels-dpdk-the-userspace-data-plane" target="_blank" rel="noopener">DPDK essay ↗</a></td></tr>
+          <a href="https://nareshns2004.substack.com/p/intels-dpdk-the-userspace-data-plane" target="_blank" rel="noopener">DPDK essay ↗</a>
+          <a href="posts/packet-path.html">packet path post</a></td></tr>
         <tr><td>Virtualization (SR-IOV / KVM)</td><td>write-up</td><td>
           <a href="https://nareshns2004.substack.com/p/virtualization-the-foundation-of" target="_blank" rel="noopener">Virtualization essay ↗</a>
           <!-- TODO(naresh): link SR-IOV/KVM work evidence (repo, talk, or post) --></td></tr>

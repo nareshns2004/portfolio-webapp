@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Page not found — Naresh Kumar</title>
+<meta name="description" content="This page doesn't exist. Head back to the homepage or the writing index.">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="icon" href="/favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Root-absolute paths: Vercel serves this page for missing URLs at any depth. -->
+<link rel="stylesheet" href="/assets/css/site.css">
+<style>
+  .nf { max-width: 760px; margin: 0 auto; padding: calc(var(--nav-h) + 4rem) 1.25rem 2rem; }
+  .nf h1 { font-weight: 600; font-size: clamp(2rem, 5vw, 2.8rem); line-height: 1.1; letter-spacing: -0.02em; margin: 0.5rem 0 1rem; }
+  .nf p { color: var(--text-mid); font-size: 1.08rem; max-width: 60ch; margin-bottom: 1rem; }
+  .nf code { font-family: var(--font-mono); font-size: 0.9em; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 3px; padding: 0.05rem 0.35rem; overflow-wrap: anywhere; }
+  .fig { margin: 2rem 0; border: 1px solid var(--ink); border-radius: 2px; }
+  .fig-bar { display: flex; justify-content: space-between; padding: 0.4rem 0.75rem; border-bottom: 1px solid var(--ink); font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  .fig-bar span:last-child { color: var(--text-dim); }
+  .fig svg { display: block; width: 100%; height: auto; padding: 0.5rem; }
+  .fig svg text { font-family: var(--font-mono); }
+  .links { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="/">naresh<span>.</span>infra</a>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="/#work">Work</a></li>
+      <li><a href="/#writing">Writing</a></li>
+      <li><a href="/#contact">Contact</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
+  </div>
+</nav>
+
+<main id="main" class="nf">
+  <p class="section-kicker">404 · not found</p>
+  <h1>This request was dropped.</h1>
+  <p>Nothing is routed to <code id="path">this path</code>. The link may be old or mistyped, or the page moved when the site was restructured.</p>
+
+  <figure class="fig">
+    <figcaption class="fig-bar"><span>Fig. 404 · XDP verdict</span><span>1 packet</span></figcaption>
+    <svg viewBox="0 0 640 150" role="img" aria-label="A request arrives at the NIC, an XDP program inspects it, finds no route and returns XDP_DROP.">
+      <g style="fill:none;stroke:var(--ink)" stroke-width="1.3">
+        <rect x="20" y="50" width="120" height="44" rx="2" style="fill:var(--paper)"/>
+        <rect x="250" y="50" width="150" height="44" rx="2" style="fill:var(--paper-2)"/>
+        <rect x="500" y="50" width="120" height="44" rx="2" stroke-dasharray="4 3" style="fill:var(--paper)"/>
+        <line x1="140" y1="72" x2="250" y2="72"/>
+      </g>
+      <line x1="400" y1="72" x2="500" y2="72" style="stroke:var(--rule-strong)" stroke-dasharray="4 4"/>
+      <path d="M440,62 L460,82 M460,62 L440,82" style="stroke:var(--fault)" stroke-width="2.5"/>
+      <circle cx="195" cy="72" r="5" style="fill:var(--copper)"/>
+      <g font-size="12" text-anchor="middle" style="fill:var(--ink)">
+        <text x="80" y="76">GET request</text>
+        <text x="325" y="76">route lookup</text>
+        <text x="560" y="76" style="fill:var(--graphite)">page</text>
+      </g>
+      <text x="325" y="122" font-size="12.5" font-weight="600" text-anchor="middle" style="fill:var(--fault)">return XDP_DROP;</text>
+      <text x="325" y="36" font-size="11" text-anchor="middle" style="fill:var(--graphite)">no match in the routing table</text>
+    </svg>
+  </figure>
+
+  <p>These routes do resolve:</p>
+  <div class="links">
+    <a class="btn btn-primary" href="/">Homepage →</a>
+    <a class="btn btn-outline" href="/#writing">Interactive posts</a>
+    <a class="btn btn-outline" href="/#work">The work</a>
+  </div>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="/">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="/assets/js/site.js"></script>
+<script>
+  // Show the requested path (as text, never HTML).
+  document.getElementById('path').textContent = location.pathname + location.search;
+</script>
+</body>
+</html>

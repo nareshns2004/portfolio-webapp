@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The packet path: kernel stack vs XDP vs DPDK vs RDMA — Naresh Kumar</title>
+<meta name="description" content="An interactive figure tracing one packet through the Linux kernel stack, XDP, DPDK and RDMA: where each step runs, how many copies it costs, and what each path gives up. Plus a line-rate cycle-budget calculator.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/packet-path.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The packet path: kernel stack vs XDP vs DPDK vs RDMA">
+<meta property="og:description" content="Step one packet through four datapaths and see who does the work, how many copies it costs, and what each path gives up.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/packet-path.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .paths { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+  .band-label { font-size: 11px; letter-spacing: 0.08em; }
+  .stage rect { stroke-width: 1.2; transition: fill 0.2s, stroke 0.2s; }
+  .stage text { font-size: 10.5px; }
+  .stage.setup rect { stroke-dasharray: 4 3; }
+  .stage.active rect { stroke-width: 2.4; }
+  .lane-title { font-size: 12px; font-weight: 600; }
+  .narration { min-height: 4.2rem; }
+  .narration .step-k { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+  .cmp td:first-child { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-dim); white-space: nowrap; }
+  .cmp th.sel, .cmp td.sel { background: var(--paper-2); }
+  .gdr { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-mid); }
+  .gdr input { accent-color: var(--signal); }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"The packet path: kernel stack vs XDP vs DPDK vs RDMA","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-05"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip">Foundations</span><span class="chip">▶ Interactive</span></div>
+    <h1>The packet path: kernel stack vs XDP vs DPDK vs RDMA</h1>
+    <p class="post-dek">Four ways for bytes to get from a NIC to the code that wants them. Each one moves work away from the general-purpose kernel, and each one gives something up to do it.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 8 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>At 100 Gb/s a minimum-size packet arrives every <b>6.7 ns</b>, about 20 cycles of a 3 GHz core. The general-purpose kernel path can’t spend so little per packet, so it relies on batching, offloads and many cores.</li>
+      <li><b>XDP</b> runs your eBPF code in the driver, before the kernel allocates anything. <b>DPDK</b> moves the driver into a user-space process that polls the NIC. <b>RDMA</b> moves the whole transport into the NIC.</li>
+      <li>AI clusters use all four: RDMA (with GPUDirect) for collectives and KV transfer, the kernel stack for control and serving traffic, eBPF for policy and observability, DPDK-style polling where packet rate dominates.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>The budget</h2>
+    <p>Start with arithmetic. On Ethernet, every frame also costs 20 bytes on the wire (preamble, start delimiter and inter-frame gap). So a packet of <code>S</code> bytes occupies <code>(S + 20) × 8</code> bit-times, and at line rate the next one arrives right behind it. Divide by your clock and you get the CPU cycles one core can spend on each packet before it falls behind.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="b-title">
+    <div class="widget-head"><span class="widget-title" id="b-title">Line-rate budget per packet</span><span class="widget-hint">pure arithmetic</span></div>
+    <div class="controls">
+      <div class="control"><label for="b-link">Link</label>
+        <select id="b-link"><option value="10">10 Gb/s</option><option value="25">25 Gb/s</option><option value="100" selected>100 Gb/s</option><option value="200">200 Gb/s</option><option value="400">400 Gb/s</option></select></div>
+      <div class="control"><label for="b-size">Frame size <output for="b-size"></output></label>
+        <input type="range" id="b-size" min="0" max="7" step="1" value="0"></div>
+      <div class="control"><label for="b-ghz">Core clock <output for="b-ghz"></output></label>
+        <input type="range" id="b-ghz" min="20" max="40" step="1" value="30"></div>
+      <div class="control"><label for="b-cores">Cores sharing the work <output for="b-cores"></output></label>
+        <input type="range" id="b-cores" min="0" max="5" step="1" value="0"></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Packets / s at line rate</div><div class="stat-value" id="o-pps">–</div></div>
+      <div class="stat"><div class="stat-label">Time per packet</div><div class="stat-value" id="o-ns">–</div></div>
+      <div class="stat"><div class="stat-label">Cycles per packet</div><div class="stat-value" id="o-cyc">–</div><div class="stat-sub" id="o-cyc-sub"></div></div>
+    </div>
+    <p class="callout" id="b-note"></p>
+  </figure>
+
+  <div class="prose">
+    <p>A few dozen cycles is less than one cache miss to DRAM. The only ways through are to do less per packet, touch fewer cache lines, batch work, spread it across many cores, or hand it to the NIC. The four paths below are different mixes of those moves.</p>
+
+    <h2>Four paths, one figure</h2>
+    <p>Pick a path and step through it. The bands show <em>where</em> each step runs: NIC hardware, the kernel, or user space. Dashed boxes are setup the kernel does once, not per packet.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="p-title">
+    <div class="widget-head"><span class="widget-title" id="p-title">One packet, four datapaths</span><span class="widget-hint">Step through, or play</span></div>
+    <div class="paths" role="group" aria-label="Choose a datapath" id="path-btns"></div>
+    <div class="fig-scroll" tabindex="0" aria-label="Datapath figure (scrolls sideways on small screens)"><svg id="pp" viewBox="0 0 900 470" role="img" aria-label="Datapath figure. The current step is described in the text below the figure."></svg></div>
+    <div class="btn-row">
+      <button class="wbtn" id="p-prev">◀ Back</button>
+      <button class="wbtn primary" id="p-next">Next step ▶</button>
+      <button class="wbtn" id="p-play">▶ Play</button>
+      <label class="gdr" id="gdr-wrap"><input type="checkbox" id="gdr" checked> GPUDirect RDMA (DMA straight into GPU memory)</label>
+    </div>
+    <div class="callout narration" id="narr" aria-live="polite"></div>
+  </figure>
+
+  <div class="prose">
+    <h2>What each path gives up</h2>
+    <table class="cmp" id="cmp">
+      <thead><tr><th></th><th data-k="kernel">Kernel stack</th><th data-k="xdp">XDP / AF_XDP</th><th data-k="dpdk">DPDK</th><th data-k="rdma">RDMA</th></tr></thead>
+      <tbody>
+        <tr><td>Per-packet work runs in</td><td data-k="kernel">kernel (softirq)</td><td data-k="xdp">driver hook, then kernel or user</td><td data-k="dpdk">user-space poll loop</td><td data-k="rdma">NIC hardware</td></tr>
+        <tr><td>CPU copies to the app</td><td data-k="kernel">1 (socket → user buffer)</td><td data-k="xdp">0 with AF_XDP zero-copy</td><td data-k="dpdk">0 (app reads the mbuf)</td><td data-k="rdma">0, and none on the remote CPU</td></tr>
+        <tr><td>Interrupts on the data path</td><td data-k="kernel">yes, mitigated by NAPI</td><td data-k="xdp">same as kernel (NAPI)</td><td data-k="dpdk">none (busy polling)</td><td data-k="rdma">none needed (poll the CQ)</td></tr>
+        <tr><td>Transport (TCP, retransmit)</td><td data-k="kernel">kernel</td><td data-k="xdp">kernel on XDP_PASS, else yours</td><td data-k="dpdk">yours (or a user-space stack)</td><td data-k="rdma">NIC: reliable connection in hardware</td></tr>
+        <tr><td>tcpdump, iptables, ss…</td><td data-k="kernel">all work</td><td data-k="xdp">partly (before the stack)</td><td data-k="dpdk">no: the kernel never sees the packets</td><td data-k="rdma">no: needs NIC-side counters</td></tr>
+        <tr><td>What you give up</td><td data-k="kernel">per-packet efficiency</td><td data-k="xdp">verifier limits, per-packet programs</td><td data-k="dpdk">dedicated cores at 100%, your own stack</td><td data-k="rdma">verbs API, memory registration, a fabric that tolerates RDMA</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Where this shows up in an AI cluster</h2>
+    <ul>
+      <li><strong>Collectives run on RDMA.</strong> NCCL’s network transport uses InfiniBand verbs (over InfiniBand or RoCE), and with GPUDirect RDMA the NIC reads and writes GPU memory directly over PCIe, with no bounce through host memory. Toggle GPUDirect in the figure to see the extra hop it removes. It’s also the path my <a href="https://github.com/nareshns2004/disaggregated-inference-engine" target="_blank" rel="noopener">kvwire</a> transport uses to move KV cache between prefill and decode GPUs.</li>
+      <li><strong>RDMA needs a fabric that cooperates.</strong> Hardware transport assumes little or no loss, which is why RoCE fabrics run <a href="pfc-deadlock.html">PFC and ECN</a>, and why NIC counters, not tcpdump, are how you debug them. That’s the gap <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof</a> works in.</li>
+      <li><strong>The kernel stack still carries everything else:</strong> control planes, checkpoint and dataset traffic over TCP, and inference front-ends. Its per-packet cost is why tuning (RSS, GRO, busy polling, IRQ affinity) matters at high rates. <a href="https://github.com/nareshns2004/kernel-performance-toolkit" target="_blank" rel="noopener">kptk</a> is my toolkit for the CPU side of that.</li>
+      <li><strong>eBPF is the programmable layer:</strong> XDP for early drops and steering, tc/eBPF for shaping and policy. My <a href="https://github.com/nareshns2004/kernel-level-ai-traffic-shaper" target="_blank" rel="noopener">traffic-shaper</a> repo is an early experiment there.</li>
+      <li><strong>DPDK</strong> wins where packet rate dominates and you can afford dedicated cores, such as virtual switches, load balancers and packet processing appliances. I wrote about it on <a href="https://nareshns2004.substack.com/p/intels-dpdk-the-userspace-data-plane" target="_blank" rel="noopener">Substack</a>.</li>
+    </ul>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>The budget uses 20 bytes of per-frame overhead (8 preamble/SFD + 12 inter-frame gap) and ignores everything else a core does. Real per-packet cost depends on the CPU, cache behaviour, driver, batching and offloads, so this page makes no throughput claims for any path.</li>
+      <li>The figure is simplified: one RX queue, no TSO/GRO detail, and AF_XDP shown in zero-copy mode (copy mode adds one copy). RDMA is shown for a one-sided RDMA WRITE on a reliable connection, where the remote CPU only sees a completion if it asked for one.</li>
+      <li>“Setup” steps (binding the device to vfio-pci, creating queue pairs, registering memory) happen once, through the kernel, and are drawn dashed.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="rail-topology.html"><div class="k">Next · interactive</div><div class="v">Where NCCL traffic actually goes: rail-optimized vs fat-tree</div></a>
+      <a class="card" href="pfc-deadlock.html"><div class="k">Interactive</div><div class="v">PFC: the lossless network that can freeze itself</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+/* ── Budget calculator ── */
+(function () {
+  const SIZES = [64, 128, 256, 512, 1024, 1500, 4096, 9000];
+  const CORES = [1, 2, 4, 8, 16, 32];
+  function update() {
+    const gbps = +P.$('#b-link').value, S = SIZES[+P.$('#b-size').value];
+    const ghz = +P.$('#b-ghz').value / 10, cores = CORES[+P.$('#b-cores').value];
+    const sec = (S + 20) * 8 / (gbps * 1e9);
+    const cyc = sec * ghz * 1e9 * cores;
+    P.$('#o-pps').textContent = `${(1 / sec / 1e6).toFixed(1 / sec >= 1e8 ? 0 : 1)} M`;
+    P.$('#o-ns').textContent = sec < 1e-6 ? `${(sec * 1e9).toFixed(2)} ns` : `${(sec * 1e6).toFixed(2)} µs`;
+    const c = P.$('#o-cyc');
+    c.textContent = P.num(cyc, cyc < 100 ? 1 : 0);
+    c.className = 'stat-value ' + (cyc < 100 ? 'bad' : cyc < 1000 ? 'warn' : 'good');
+    P.$('#o-cyc-sub').textContent = cores > 1 ? `per packet, spread over ${cores} cores` : 'per packet, one core';
+    P.$('#b-note').innerHTML = cyc < 100
+      ? `<b>Tight.</b> ${P.num(cyc, 1)} cycles is less than a single trip to DRAM. Only batched, cache-friendly code (or the NIC itself) keeps up here.`
+      : cyc < 1000
+        ? `<b>Workable with care.</b> Hundreds of cycles leaves room for a lean datapath, not for per-packet allocations and deep call chains.`
+        : `<b>Comfortable for a lean path.</b> Large frames buy time. This is why jumbo frames and segmentation offloads matter as much as datapath choice.`;
+  }
+  P.bind('b-size', v => `${SIZES[v]} B`, update);
+  P.bind('b-ghz', v => `${(v / 10).toFixed(1)} GHz`, update);
+  P.bind('b-cores', v => CORES[v], update);
+  P.$('#b-link').addEventListener('input', update);
+  update();
+})();
+
+/* ── Datapath figure ── */
+(function () {
+  const BANDS = { user: [50, 180], kernel: [190, 320], hw: [330, 460] };
+  const BAND_LABEL = { user: 'USER SPACE', kernel: 'KERNEL', hw: 'NIC / HARDWARE' };
+  const LANES = ['kernel', 'xdp', 'dpdk', 'rdma'];
+  const LANE_NAME = { kernel: 'Kernel stack', xdp: 'XDP / AF_XDP', dpdk: 'DPDK', rdma: 'RDMA' };
+  const LX = { kernel: 205, xdp: 380, dpdk: 555, rdma: 730 };
+
+  // [label, band, y-slot within band (0..2), narration, setup?]
+  const PATHS = {
+    kernel: [
+      ['NIC DMA → RX ring', 'hw', 0, 'The NIC writes the frame into a host-memory buffer from the RX ring and raises an interrupt.'],
+      ['IRQ → NAPI poll', 'kernel', 2, 'The interrupt schedules NAPI; the driver then polls the ring in softirq context, which batches work under load.'],
+      ['sk_buff + GRO', 'kernel', 1, 'The kernel allocates an sk_buff (packet metadata) and may coalesce segments with GRO.'],
+      ['tc · netfilter · IP · TCP', 'kernel', 0, 'Classification, firewalling, routing and the transport protocol: the general-purpose features you get for free.'],
+      ['recv(): copy to user', 'user', 2, 'The app calls recv(); the payload is copied from the socket buffer into the app’s buffer. One CPU copy, one syscall (or one per batch).'],
+      ['application', 'user', 0, 'The app finally has the bytes, after the most steps of any path but with every kernel tool still working.'],
+    ],
+    xdp: [
+      ['NIC DMA → RX ring', 'hw', 0, 'Same start: the NIC DMAs the frame into the RX ring.'],
+      ['driver poll', 'kernel', 2, 'The driver’s NAPI poll picks the frame up, before any sk_buff is allocated.'],
+      ['XDP program (eBPF)', 'kernel', 1, 'Your verified eBPF program runs on the raw frame and returns a verdict: DROP, TX (bounce back out), PASS (continue into the normal stack) or REDIRECT.'],
+      ['XDP_REDIRECT → AF_XDP', 'kernel', 0, 'REDIRECT can hand the frame to an AF_XDP socket. In zero-copy mode the frame already sits in UMEM, memory shared with the app.'],
+      ['UMEM rings', 'user', 2, 'The app reads descriptors from shared rings, with no copy and no per-packet syscall (only occasional wakeups).'],
+      ['application', 'user', 0, 'Kernel-adjacent speed while keeping the kernel driver, and PASS keeps the normal stack available for everything else.'],
+    ],
+    dpdk: [
+      ['bind to vfio-pci', 'kernel', 1, 'Setup, once: the NIC is unbound from its kernel driver and handed to user space via vfio-pci. From here the kernel sees no packets.', true],
+      ['NIC DMA → hugepage mbufs', 'hw', 0, 'The NIC DMAs frames straight into mbufs in hugepage memory owned by the DPDK process.'],
+      ['PMD: rte_eth_rx_burst()', 'user', 2, 'A poll-mode driver on a dedicated core spins on the RX ring and pulls packets in bursts. No interrupts, no syscalls, 100% core usage even when idle.'],
+      ['application (same core)', 'user', 0, 'The app processes the burst on the same core and cache. You now own everything the kernel used to do: ARP, IP, TCP if you need it, and observability.'],
+    ],
+    rdma: [
+      ['create QP · register MR', 'kernel', 1, 'Setup, once: the app creates queue pairs and registers (pins) the memory the NIC may access, through the kernel’s RDMA subsystem.', true],
+      ['RNIC runs transport', 'hw', 0, 'The RDMA NIC runs the reliable transport itself: sequencing, acks and retransmission. No host CPU touches the bytes.'],
+      ['DMA → registered memory', 'hw', 2, 'The NIC writes the payload directly into the registered buffer (for an RDMA WRITE, without involving the remote application at all).'],
+      ['completion queue entry', 'user', 2, 'The NIC posts a completion. The app polls the CQ in user space (kernel bypass), or asks for an event if it would rather sleep.'],
+      ['application', 'user', 0, 'Zero copies and no kernel on the data path. The price is the verbs programming model, pinned memory and a fabric tuned for RDMA.'],
+    ],
+  };
+  const GDR_OFF = [
+    ['RNIC runs transport', 'hw', 0, 'Without GPUDirect, the NIC still runs the transport in hardware…'],
+    ['DMA → pinned host memory', 'hw', 2, '…but it can only DMA into pinned host memory.'],
+    ['cudaMemcpy host → GPU', 'kernel', 0, 'A second transfer moves the data over PCIe again into GPU memory: an extra hop, extra latency and extra PCIe and host-memory traffic. (It’s issued from user space; it’s drawn here as the hop it adds.)'],
+  ];
+
+  let lane = 'kernel', step = 0, timer = null;
+  const svgEl = P.$('#pp');
+  const gdr = P.$('#gdr');
+
+  function stages(k) {
+    if (k !== 'rdma' || gdr.checked) return PATHS[k];
+    const p = PATHS.rdma;
+    return [p[0], ...GDR_OFF, p[3], p[4]];
+  }
+
+  function stagePos(k, s) {
+    const [y0, y1] = BANDS[s[1]];
+    const slot = s[2], h = 30, gap = (y1 - y0 - 3 * h) / 4;
+    return { x: LX[k] - 82, y: y0 + gap + slot * (h + gap), w: 164, h };
+  }
+
+  function draw() {
+    svgEl.innerHTML = '';
+    // bands
+    for (const [b, [y0, y1]] of Object.entries(BANDS)) {
+      P.svg('rect', { x: 0, y: y0, width: 900, height: y1 - y0, fill: b === 'kernel' ? 'var(--paper-2)' : 'var(--paper)', stroke: 'var(--rule)' }, svgEl);
+      P.svg('text', { x: 10, y: y0 + 16, class: 'band-label', fill: 'var(--graphite)' }, svgEl).textContent = BAND_LABEL[b];
+    }
+    // lanes
+    for (const k of LANES) {
+      const on = k === lane;
+      P.svg('text', { x: LX[k], y: 32, 'text-anchor': 'middle', class: 'lane-title', fill: on ? 'var(--ink)' : 'var(--graphite)' }, svgEl).textContent = LANE_NAME[k];
+      const st = stages(k);
+      // path line through per-packet stages
+      const pts = st.filter(s => !s[4]).map(s => { const p = stagePos(k, s); return [p.x + p.w / 2, p.y + p.h / 2]; });
+      if (pts.length > 1) P.svg('polyline', { points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: on ? 'var(--signal)' : 'var(--rule-strong)', 'stroke-width': on ? 2 : 1.2, 'stroke-dasharray': on ? 'none' : '3 3' }, svgEl);
+      st.forEach((s, i) => {
+        const p = stagePos(k, s);
+        const active = on && i === step, done = on && i < step;
+        const g = P.svg('g', { class: 'stage' + (s[4] ? ' setup' : '') + (active ? ' active' : '') }, svgEl);
+        P.svg('rect', { x: p.x, y: p.y, width: p.w, height: p.h, rx: 2,
+          fill: active ? 'var(--signal)' : done ? 'color-mix(in srgb, var(--signal) 14%, var(--paper))' : 'var(--paper)',
+          stroke: on ? (active ? 'var(--signal)' : 'var(--ink)') : 'var(--rule-strong)' }, g);
+        P.svg('text', { x: p.x + p.w / 2, y: p.y + p.h / 2 + 4, 'text-anchor': 'middle',
+          fill: active ? 'var(--on-ink)' : on ? 'var(--ink)' : 'var(--graphite)' }, g).textContent = s[0];
+      });
+    }
+    // packet marker on the active stage
+    const st = stages(lane), s = st[step];
+    if (s && !s[4]) {
+      const p = stagePos(lane, s);
+      P.svg('circle', { cx: p.x + p.w - 8, cy: p.y + 8, r: 4, fill: 'var(--copper)' }, svgEl);
+    }
+    narrate();
+  }
+
+  function narrate() {
+    const st = stages(lane), s = st[step];
+    P.$('#narr').innerHTML = `<div class="step-k">${LANE_NAME[lane]} · step ${step + 1} of ${st.length}${s[4] ? ' · one-time setup' : ''}</div>${s[3]}`;
+    P.$('#p-prev').disabled = step === 0;
+    P.$('#p-next').disabled = step === st.length - 1;
+    P.$$('#cmp [data-k]').forEach(c => c.classList.toggle('sel', c.dataset.k === lane));
+    P.$('#gdr-wrap').style.visibility = lane === 'rdma' ? 'visible' : 'hidden';
+  }
+
+  function choose(k) {
+    lane = k; step = 0; stop();
+    P.$$('#path-btns .wbtn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === k)));
+    draw();
+  }
+  function stop() { clearInterval(timer); timer = null; P.$('#p-play').textContent = '▶ Play'; }
+
+  P.$('#path-btns').innerHTML = LANES.map(k => `<button class="wbtn" data-k="${k}" aria-pressed="false">${LANE_NAME[k]}</button>`).join('');
+  P.$('#path-btns').addEventListener('click', e => { const k = e.target.closest('button')?.dataset.k; if (k) choose(k); });
+  P.$('#p-next').addEventListener('click', () => { stop(); step = Math.min(step + 1, stages(lane).length - 1); draw(); });
+  P.$('#p-prev').addEventListener('click', () => { stop(); step = Math.max(step - 1, 0); draw(); });
+  P.$('#p-play').addEventListener('click', () => {
+    if (timer) return stop();
+    if (step === stages(lane).length - 1) step = 0;
+    P.$('#p-play').textContent = '❚❚ Pause';
+    draw();
+    timer = setInterval(() => {
+      if (step >= stages(lane).length - 1) return stop();
+      step++; draw();
+    }, P.reduced() ? 2600 : 1700);
+  });
+  gdr.addEventListener('change', () => { step = Math.min(step, stages(lane).length - 1); draw(); });
+  document.addEventListener('themechange', draw);
+  choose('kernel');
+})();
+</script>
+</body>
+</html>

@@ -35,7 +35,7 @@ Kernel/eBPF/DPDK/RDMA depth is the *foundation* that makes both stories credible
 
 ## Interactive posts
 
-- One page per post under `posts/`, using `assets/css/post.css` and `assets/js/post.js`. Register it in `assets/js/data.js`.
+- One page per post under `posts/`, using `assets/css/post.css` and `assets/js/post.js`. Register it in `assets/js/data.js`, add it to `sitemap.xml`, and to the `<noscript>` list in `index.html`.
 - Posts may use public facts (model configs, spec-sheet numbers, published papers, with a link) and closed-form models. Every widget gets a "Model & assumptions" box. No benchmark numbers I haven't measured; illustrative logs are labelled as such.
 - Each post ends by linking the repo it relates to. Widgets must work with keyboard and under `prefers-reduced-motion`.
 
