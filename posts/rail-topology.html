@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Where NCCL traffic actually goes: rail-optimized vs fat-tree — Naresh Kumar</title>
+<meta name="description" content="An interactive topology explorer: route ring all-reduce, tensor-parallel and MoE all-to-all traffic over a rail-optimized fabric and a ToR fat-tree, and see which flows cross the spine, with and without NCCL's PXN.">
+<meta name="author" content="Naresh Kumar">
+<link rel="canonical" href="https://portfolio-webapp-roan.vercel.app/posts/rail-topology.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Where NCCL traffic actually goes: rail-optimized vs fat-tree">
+<meta property="og:description" content="Route collectives over two fabrics and count what crosses the spine, with and without PXN.">
+<meta property="og:url" content="https://portfolio-webapp-roan.vercel.app/posts/rail-topology.html">
+<meta property="og:image" content="https://portfolio-webapp-roan.vercel.app/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F7F5F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10151D" media="(prefers-color-scheme: dark)">
+<script>try { var t = localStorage.getItem('theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
+<link rel="icon" href="../favicon.ico" type="image/x-icon">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/site.css">
+<link rel="stylesheet" href="../assets/css/post.css">
+<style>
+  .opt-row { display: flex; flex-wrap: wrap; gap: 1rem 1.5rem; align-items: center; margin-bottom: 0.75rem; }
+  .seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 3px; overflow: hidden; }
+  .seg button { font-family: var(--font-mono); font-size: 0.76rem; background: var(--paper); color: var(--ink); border: 0; border-right: 1px solid var(--ink); padding: 0.4rem 0.7rem; cursor: pointer; }
+  .seg button:last-child { border-right: 0; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); }
+  .seg-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); margin-right: 0.4rem; }
+  .pxn { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.78rem; }
+  .pxn input { accent-color: var(--signal); }
+  .pxn.off { opacity: 0.45; }
+  #topo text { font-family: var(--font-mono); }
+</style>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"BlogPosting","headline":"Where NCCL traffic actually goes: rail-optimized vs fat-tree","author":{"@type":"Person","name":"Naresh Kumar","url":"https://portfolio-webapp-roan.vercel.app/"},"datePublished":"2026-10-05"}
+</script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<nav class="nav" aria-label="Primary">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../index.html">naresh<span>.</span>infra</a>
+    <ul class="nav-links" id="nav-links">
+      <li><a href="../index.html#work">Work</a></li>
+      <li><a href="../index.html#writing">Writing</a></li>
+      <li><a href="../index.html#contact">Contact</a></li>
+    </ul>
+    <div class="nav-right">
+      <button class="theme-toggle" type="button" aria-label="Switch to dark theme">◐</button>
+      <button class="nav-toggle" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    </div>
+  </div>
+</nav>
+
+<main id="main" class="post">
+  <a class="post-back" href="../index.html#writing">← All writing</a>
+  <header class="post-head">
+    <div class="chips"><span class="chip">Fabric</span><span class="chip">▶ Interactive</span></div>
+    <h1>Where NCCL traffic actually goes: rail-optimized vs fat-tree</h1>
+    <p class="post-dek">The same 32 GPUs, two ways to cable them, three kinds of traffic. Route them and count what has to cross the spine.</p>
+    <p class="post-byline">Naresh Kumar · Oct 2026 · 7 min read</p>
+  </header>
+
+  <aside class="tldr">
+    <strong>TL;DR</strong>
+    <ul>
+      <li>In a <b>rail-optimized</b> fabric, NIC <code>i</code> of every node plugs into rail switch <code>i</code>. Data-parallel ring traffic between same-index GPUs never leaves its rail switch.</li>
+      <li>All-to-all (MoE expert parallelism) breaks that alignment: GPU 2 talks to GPU 5 on another node, so 7 of every 8 flows cross the spine.</li>
+      <li>NCCL’s <b>PXN</b> (2.12+) fixes this by first moving the data over NVLink to the GPU on the destination’s rail. Spine traffic drops to zero, at the cost of one NVLink hop.</li>
+    </ul>
+  </aside>
+
+  <div class="prose">
+    <h2>Two ways to cable a GPU cluster</h2>
+    <p>Modern GPU servers have one high-speed NIC per GPU, so an 8-GPU node has 8 network ports. There are two common ways to connect them:</p>
+    <ul>
+      <li><strong>Top-of-rack (ToR) fat-tree.</strong> All 8 NICs of a node go to the same leaf switch, and leaves connect through spines. It is simple and rail-agnostic: traffic between nodes on different leaves goes up through a spine.</li>
+      <li><strong>Rail-optimized.</strong> NIC 0 of every node goes to leaf (rail) 0, NIC 1 to rail 1, and so on. NVIDIA’s <a href="https://developer.nvidia.com/blog/doubling-all2all-performance-with-nvidia-collective-communication-library-2-12/" target="_blank" rel="noopener">NCCL 2.12 write-up</a> describes it as maximizing all-reduce performance while minimizing interference between flows.</li>
+    </ul>
+    <p>Which one wins depends entirely on <em>who talks to whom</em>. So route some traffic.</p>
+  </div>
+
+  <figure class="widget" aria-labelledby="t-title">
+    <div class="widget-head"><span class="widget-title" id="t-title">Topology explorer · 4 nodes × 8 GPUs</span><span class="widget-hint">line weight = flows on that link</span></div>
+    <div class="opt-row">
+      <span><span class="seg-label">Fabric</span><span class="seg" id="seg-topo" role="group" aria-label="Fabric">
+        <button data-v="rail" aria-pressed="true">Rail-optimized</button><button data-v="tor" aria-pressed="false">ToR fat-tree</button></span></span>
+      <span><span class="seg-label">Traffic</span><span class="seg" id="seg-pat" role="group" aria-label="Traffic pattern">
+        <button data-v="ring" aria-pressed="true">DP ring</button><button data-v="tp" aria-pressed="false">TP in node</button><button data-v="a2a" aria-pressed="false">MoE all-to-all</button></span></span>
+      <label class="pxn" id="pxn-wrap"><input type="checkbox" id="pxn"> PXN (NVLink to the destination’s rail first)</label>
+    </div>
+    <div class="fig-scroll" tabindex="0" aria-label="Fabric diagram (scrolls sideways on small screens)"><svg id="topo" viewBox="0 0 900 430" role="img" aria-label="Fabric diagram with link loads. Totals are summarized below."></svg></div>
+    <div class="legend">
+      <span><i style="background:var(--signal)"></i>NIC ↔ leaf</span>
+      <span><i style="background:var(--copper)"></i>leaf ↔ spine</span>
+      <span><i style="background:var(--ink)"></i>traced flow</span>
+    </div>
+    <div class="btn-row"><button class="wbtn" id="trace">Trace a random flow</button></div>
+    <div class="stats">
+      <div class="stat"><div class="stat-label">Network flows</div><div class="stat-value" id="o-flows">–</div><div class="stat-sub" id="o-nv"></div></div>
+      <div class="stat"><div class="stat-label">Cross the spine</div><div class="stat-value" id="o-spine">–</div></div>
+      <div class="stat"><div class="stat-label">Switch hops / flow</div><div class="stat-value" id="o-hops">–</div><div class="stat-sub">average</div></div>
+      <div class="stat"><div class="stat-label">Busiest link</div><div class="stat-value" id="o-max">–</div><div class="stat-sub" id="o-maxw"></div></div>
+    </div>
+    <p class="callout" id="insight"></p>
+  </figure>
+
+  <div class="prose">
+    <h2>What the explorer shows</h2>
+    <h3>Data-parallel rings stay on their rail</h3>
+    <p>For each GPU, NCCL uses the NIC closest to it on PCIe, and it builds inter-node rings between same-index GPUs: GPU 3 on node 0 sends to GPU 3 on node 1. On a rail-optimized fabric every one of those flows is <em>leaf-local</em>, one switch hop and nothing on the spine. On the ToR fabric, the flows between nodes on different leaves must climb to a spine, and they share those uplinks with everything else. That is the case rail-optimized fabrics are built for, and why the spine layer can be lighter (or oversubscribed) in a rail design.</p>
+
+    <h3>Tensor parallelism never touches the network</h3>
+    <p>TP all-reduces happen every layer and are latency-critical, so frameworks keep TP groups inside a node, on NVLink. Switch to “TP in node” and the fabric goes quiet in both designs. Parallelism layout is a network design decision.</p>
+
+    <h3>All-to-all is where rails hurt, and PXN is the fix</h3>
+    <p>Mixture-of-experts layers send tokens from every GPU to every expert, so GPU <code>i</code> talks to GPU <code>j ≠ i</code> on other nodes. On rails, that means rail <code>i</code> → spine → rail <code>j</code>, and 7/8 of the flows land on the spine. NCCL 2.12 introduced <strong>PXN</strong> (PCI × NVLink): the source GPU first moves the data over NVLink to the GPU on the same node that sits on rail <code>j</code>, and that GPU sends it over its own NIC. Turn PXN on: spine flows go to zero, and the cost moves to NVLink, which has far more bandwidth than a NIC. It also lets NCCL aggregate messages headed for the same destination.</p>
+
+    <h3>Why this matters beyond bandwidth</h3>
+    <ul>
+      <li><strong>Blast radius.</strong> On rails, a bad rail switch or cable hits one GPU index on many nodes, the “rail-3 ranks are stuck” signature in my <a href="nccl-timeout-triage.html">triage drill</a>. On ToR, a bad leaf takes whole nodes.</li>
+      <li><strong>Congestion.</strong> Spine links are where flows from unrelated jobs meet. Keeping collectives leaf-local reduces how often <a href="pfc-deadlock.html">pause back-pressure</a> spreads between them.</li>
+      <li><strong>Attribution.</strong> Mapping “rank 11 is slow” to “node 1, NIC mlx5_3, rail switch 3, port 1” is exactly the topology join that <a href="https://github.com/nareshns2004/ai-nic-performance-profiler" target="_blank" rel="noopener">nicprof</a> and <a href="https://github.com/nareshns2004/fault-tolerant-training-orchestrator" target="_blank" rel="noopener">goodput</a> depend on.</li>
+    </ul>
+  </div>
+
+  <aside class="assumptions">
+    <h2>Model &amp; assumptions</h2>
+    <ul>
+      <li>This counts <em>flows</em>, not bytes or bandwidth: one flow per (source GPU, destination GPU) pair. Real NCCL splits traffic across channels, pipelines chunks, and may pick trees instead of rings.</li>
+      <li>Fabrics are drawn at toy scale: 4 nodes, 2 spines, 8 rail leaves (rail-optimized) or 2 ToR leaves holding 2 nodes each. Leaf → spine choice is round-robin per leaf pair, standing in for an evenly balanced ECMP.</li>
+      <li>PXN is modeled only for cross-rail flows on the rail fabric (on ToR every NIC of a node shares one leaf, so it changes nothing here). Intra-node traffic is counted as NVLink hops, not network flows.</li>
+    </ul>
+  </aside>
+
+  <section class="post-end">
+    <h2>Keep going</h2>
+    <div class="post-end-grid">
+      <a class="card" href="ring-allreduce-failure.html"><div class="k">Interactive</div><div class="v">One dead link, 512 idle GPUs: ring all-reduce under failure</div></a>
+      <a class="card" href="packet-path.html"><div class="k">Interactive</div><div class="v">The packet path: kernel stack vs XDP vs DPDK vs RDMA</div></a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span>© Naresh Kumar · <a href="../index.html">Home</a></span>
+  <div class="footer-links">
+    <a href="https://github.com/nareshns2004" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://huggingface.co/nareshns2004" target="_blank" rel="noopener">Hugging Face</a>
+    <a href="https://www.linkedin.com/in/nareshns2004/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="https://x.com/naresh_swe24" target="_blank" rel="noopener">X</a>
+  </div>
+</footer>
+
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/post.js"></script>
+<script>
+(function () {
+  const NODES = 4, G = 8, SPINES = 2;
+  let topo = 'rail', pat = 'ring', traced = null;
+  const svgEl = P.$('#topo'), pxnEl = P.$('#pxn');
+
+  // ── Geometry ──
+  const spineX = s => 330 + s * 240, SPINE_Y = 40;
+  const leafCount = () => topo === 'rail' ? G : 2;
+  const leafX = l => topo === 'rail' ? 75 + l * 107 : 255 + l * 390;
+  const LEAF_Y = 160;
+  const nodeX = n => 30 + n * 215, NODE_Y = 300, NODE_W = 195;
+  const gpuX = (n, g) => nodeX(n) + 14 + g * 22, GPU_Y = 330;
+  const leafOf = (n, g) => topo === 'rail' ? g : (n < 2 ? 0 : 1);
+  const leafName = l => topo === 'rail' ? `rail ${l}` : `ToR ${l}`;
+
+  // ── Traffic: list of [srcNode, srcGpu, dstNode, dstGpu] ──
+  function flows() {
+    const f = [];
+    if (pat === 'ring') for (let g = 0; g < G; g++) for (let n = 0; n < NODES; n++) f.push([n, g, (n + 1) % NODES, g]);
+    if (pat === 'tp') for (let n = 0; n < NODES; n++) for (let g = 0; g < G; g++) f.push([n, g, n, (g + 1) % G]);
+    if (pat === 'a2a') for (let n = 0; n < NODES; n++) for (let g = 0; g < G; g++)
+      for (let m = 0; m < NODES; m++) if (m !== n) for (let h = 0; h < G; h++) f.push([n, g, m, h]);
+    return f;
+  }
+
+  // ── Routing: returns { nvlink, links: [linkId…], hops } ──
+  function route([n, g, m, h], rr) {
+    if (n === m) return { nvlink: 1, links: [], hops: 0 };
+    let nv = 0, sg = g;
+    const usePxn = pxnEl.checked && topo === 'rail' && g !== h;
+    if (usePxn) { nv = 1; sg = h; }                     // NVLink to the GPU on the destination's rail
+    const ls = leafOf(n, sg), ld = leafOf(m, h);
+    const links = [`up:${n}:${sg}`];
+    let hops = 1;
+    if (ls !== ld) {
+      const key = `${ls}-${ld}`;
+      const s = (rr[key] = (rr[key] ?? -1) + 1) % SPINES; // ECMP stand-in: round-robin per leaf pair
+      links.push(`ls:${ls}:${s}`, `ls:${ld}:${s}`);
+      hops = 3;
+    }
+    links.push(`up:${m}:${h}`);
+    return { nvlink: nv, links, hops, path: { n, sg, m, h, ls, ld, spine: ls !== ld ? +links[1].split(':')[2] : null, pxnFrom: usePxn ? g : null } };
+  }
+
+  function compute() {
+    const fl = flows(), load = {};
+    let net = 0, spine = 0, hops = 0, nv = 0;
+    const rr = {};
+    const routes = fl.map(f => route(f, rr));
+    routes.forEach(r => {
+      nv += r.nvlink;
+      if (!r.links.length) return;
+      net++; hops += r.hops; if (r.hops === 3) spine++;
+      r.links.forEach(l => load[l] = (load[l] || 0) + 1);
+    });
+    let maxL = 0, maxK = '';
+    for (const [k, v] of Object.entries(load)) if (v > maxL) { maxL = v; maxK = k; }
+    return { fl, routes, load, net, spine, hops, nv, maxL, maxK };
+  }
+
+  function draw() {
+    const c = compute();
+    svgEl.innerHTML = '';
+    const maxL = Math.max(1, c.maxL);
+    const w = v => v ? 0.8 + 6 * v / maxL : 0.6;
+
+    // leaf ↔ spine
+    for (let l = 0; l < leafCount(); l++) for (let s = 0; s < SPINES; s++) {
+      const v = c.load[`ls:${l}:${s}`] || 0;
+      P.svg('line', { x1: leafX(l), y1: LEAF_Y - 14, x2: spineX(s), y2: SPINE_Y + 14, stroke: v ? 'var(--copper)' : 'var(--rule-strong)', 'stroke-width': w(v), opacity: v ? 0.9 : 1 }, svgEl);
+    }
+    // NIC ↔ leaf
+    for (let n = 0; n < NODES; n++) for (let g = 0; g < G; g++) {
+      const v = c.load[`up:${n}:${g}`] || 0;
+      P.svg('line', { x1: gpuX(n, g) + 8, y1: GPU_Y - 2, x2: leafX(leafOf(n, g)), y2: LEAF_Y + 14, stroke: v ? 'var(--signal)' : 'var(--rule)', 'stroke-width': v ? w(v) : 0.6, opacity: v ? 0.75 : 1 }, svgEl);
+    }
+    // traced flow on top
+    if (traced !== null && c.routes[traced]) {
+      const r = c.routes[traced], p = r.path, ink = { stroke: 'var(--ink)', 'stroke-width': 3, fill: 'none' };
+      if (p) {
+        const pts = [[gpuX(p.n, p.sg) + 8, GPU_Y], [leafX(p.ls), LEAF_Y]];
+        if (p.spine !== null) pts.push([spineX(p.spine), SPINE_Y], [leafX(p.ld), LEAF_Y]);
+        pts.push([gpuX(p.m, p.h) + 8, GPU_Y]);
+        P.svg('polyline', { points: pts.map(q => q.join(',')).join(' '), ...ink }, svgEl);
+        if (p.pxnFrom !== null) P.svg('path', { d: `M${gpuX(p.n, p.pxnFrom) + 8},${GPU_Y + 22} Q${(gpuX(p.n, p.pxnFrom) + gpuX(p.n, p.sg)) / 2 + 8},${GPU_Y + 52} ${gpuX(p.n, p.sg) + 8},${GPU_Y + 22}`, ...ink, 'stroke-dasharray': '4 3' }, svgEl);
+      } else {
+        const [n, g, , h] = c.fl[traced];
+        P.svg('path', { d: `M${gpuX(n, g) + 8},${GPU_Y + 22} Q${(gpuX(n, g) + gpuX(n, h)) / 2 + 8},${GPU_Y + 52} ${gpuX(n, h) + 8},${GPU_Y + 22}`, ...ink, 'stroke-dasharray': '4 3' }, svgEl);
+      }
+    }
+    // spines
+    for (let s = 0; s < SPINES; s++) {
+      P.svg('rect', { x: spineX(s) - 50, y: SPINE_Y - 14, width: 100, height: 28, rx: 2, fill: 'var(--paper)', stroke: 'var(--ink)' }, svgEl);
+      P.svg('text', { x: spineX(s), y: SPINE_Y + 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--ink)' }, svgEl).textContent = `spine ${s}`;
+    }
+    // leaves
+    for (let l = 0; l < leafCount(); l++) {
+      const lw = topo === 'rail' ? 80 : 120;
+      P.svg('rect', { x: leafX(l) - lw / 2, y: LEAF_Y - 14, width: lw, height: 28, rx: 2, fill: 'var(--paper)', stroke: 'var(--ink)' }, svgEl);
+      P.svg('text', { x: leafX(l), y: LEAF_Y + 4, 'text-anchor': 'middle', 'font-size': 11, fill: 'var(--ink)' }, svgEl).textContent = leafName(l);
+    }
+    // nodes + GPUs
+    for (let n = 0; n < NODES; n++) {
+      P.svg('rect', { x: nodeX(n), y: NODE_Y, width: NODE_W, height: 78, rx: 2, fill: 'var(--paper-2)', stroke: 'var(--ink)' }, svgEl);
+      P.svg('text', { x: nodeX(n) + 8, y: NODE_Y + 16, 'font-size': 10.5, fill: 'var(--graphite)' }, svgEl).textContent = `node ${n} · NVLink`;
+      for (let g = 0; g < G; g++) {
+        P.svg('rect', { x: gpuX(n, g), y: GPU_Y, width: 16, height: 20, rx: 1.5, fill: 'var(--paper)', stroke: 'var(--ink)' }, svgEl);
+        P.svg('text', { x: gpuX(n, g) + 8, y: GPU_Y + 14, 'text-anchor': 'middle', 'font-size': 9.5, fill: 'var(--ink)' }, svgEl).textContent = g;
+      }
+    }
+    P.svg('text', { x: 450, y: 420, 'text-anchor': 'middle', 'font-size': 10.5, fill: 'var(--graphite)' }, svgEl).textContent =
+      topo === 'rail' ? 'GPU i of every node → its own NIC → rail switch i' : 'all 8 NICs of a node → that node’s ToR leaf (2 nodes per leaf)';
+
+    // stats
+    P.$('#o-flows').textContent = c.net.toLocaleString();
+    P.$('#o-nv').textContent = c.nv ? `+ ${c.nv.toLocaleString()} NVLink hops` : 'no NVLink hops';
+    const sp = P.$('#o-spine');
+    sp.textContent = c.net ? `${c.spine.toLocaleString()} (${Math.round(100 * c.spine / c.net)}%)` : '0';
+    sp.className = 'stat-value ' + (!c.net || !c.spine ? 'good' : c.spine / c.net > 0.5 ? 'bad' : 'warn');
+    P.$('#o-hops').textContent = c.net ? (c.hops / c.net).toFixed(2) : '–';
+    P.$('#o-max').textContent = c.maxL ? `${c.maxL} flows` : '–';
+    const k = c.maxK.split(':');
+    P.$('#o-maxw').textContent = !c.maxL ? 'network idle' : k[0] === 'up' ? `node ${k[1]} NIC ${k[2]} ↔ leaf` : `${leafName(+k[1])} ↔ spine ${k[2]}`;
+
+    const pxnOn = pxnEl.checked && topo === 'rail';
+    let msg;
+    if (pat === 'tp') msg = '<b>Network idle.</b> Tensor-parallel traffic stays on NVLink inside each node, in both fabrics.';
+    else if (pat === 'ring') msg = topo === 'rail'
+      ? '<b>Every ring flow is leaf-local.</b> Same-index GPUs share a rail switch, so nothing reaches the spine.'
+      : `<b>${Math.round(100 * c.spine / c.net)}% of ring flows climb to a spine</b>, wherever the ring crosses from one ToR to the other. Those uplinks are shared with every other job on the fabric.`;
+    else msg = topo === 'rail'
+      ? (pxnOn ? '<b>PXN: zero spine flows.</b> Each flow first hops over NVLink to the GPU on the destination’s rail. The cost moved to NVLink, which has far more bandwidth than a NIC.'
+               : `<b>${Math.round(100 * c.spine / c.net)}% of all-to-all flows cross the spine:</b> GPU i → GPU j ≠ i leaves rail i. Turn on PXN.`)
+      : `<b>${Math.round(100 * c.spine / c.net)}% cross the spine:</b> every flow between nodes on different ToRs, regardless of GPU index.`;
+    P.$('#insight').innerHTML = msg;
+    P.$('#pxn-wrap').classList.toggle('off', !(topo === 'rail' && pat === 'a2a'));
+  }
+
+  function seg(id, set) {
+    P.$(id).addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      P.$$(id + ' button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      set(b.dataset.v); traced = null; draw();
+    });
+  }
+  seg('#seg-topo', v => topo = v);
+  seg('#seg-pat', v => pat = v);
+  pxnEl.addEventListener('change', () => { traced = null; draw(); });
+  P.$('#trace').addEventListener('click', () => {
+    const fl = flows();
+    // prefer an interesting flow: cross-node and, for all-to-all, cross-rail
+    const pool = fl.map((f, i) => i).filter(i => fl[i][0] !== fl[i][2] && (pat !== 'a2a' || fl[i][1] !== fl[i][3]));
+    const from = pool.length ? pool : fl.map((f, i) => i);
+    traced = from[Math.floor(Math.random() * from.length)];
+    draw();
+  });
+  document.addEventListener('themechange', draw);
+  draw();
+})();
+</script>
+</body>
+</html>

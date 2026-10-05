@@ -69,6 +69,9 @@
 .widget-head .widget-title::before { content: 'Fig. ' counter(fig) ' · '; }
 .widget-hint { font-size: 0.82rem; color: var(--text-dim); }
 .widget svg { display: block; width: 100%; height: auto; }
+/* wide figures keep a legible minimum size and scroll sideways on phones */
+.fig-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.fig-scroll > svg { min-width: 680px; }
 .widget svg text { font-family: var(--font-mono); }
 
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem 1.5rem; margin: 1rem 0; }
