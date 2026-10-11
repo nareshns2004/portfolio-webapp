@@ -20,13 +20,15 @@ Backlog from CLAUDE.md, ordered by impact.
 - [x] Post: rail-optimized vs fat-tree topology explorer (`posts/rail-topology.html`).
 - [x] Site gaps: `robots.txt`, `sitemap.xml` (update when adding a post), custom `404.html`.
 - [ ] When goodput / kvwire publish a first measured result, add it to the proof strip with a link to the run directory.
+- [x] Hugging Face update: infra-incident-intel in proof strip, Reliability block (Models row + Space links), Foundations and Profiles; "Interactive notes" wording replaced site-wide.
+- [ ] When `infra-failure-bench` or the triage model is published on the Hub, link it directly from the Reliability block and Foundations.
 
 ## Open questions for Naresh
 
 - **vLLM PR #50618**: on GitHub it's by JohnQinAMD and unmerged. Did you contribute under another account, or is it a different PR number? Send the link and it becomes the first proof item.
 - Links for the **cudagraph padding issue** and the **libbpf BTF fix**, if they exist.
 - ~~Hero line~~: done, blend of A + C.
-- **Hugging Face model cards** are empty (license only). Even a short card (task, data, eval) makes the proof strip much stronger.
+- **Hugging Face:** the proof strip now points at `infra-incident-intel` and the two reserved Spaces (Oct 11). The 6 older model repos still hold a README only, so Foundations labels them `design`. Upload weights + eval to promote them.
 - The 5 removed posts (XDP 14 Mpps, DPDK PMD, RDMA, RoCE/PFC, SR-IOV): publish any real drafts on Substack and add them to `data.js`.
 
-Next session starts with: open questions above (vLLM PR link, HF model cards); then fix the over-claiming READMEs in kernel-level-ai-traffic-shaper and distributed-training-framework-nccl that the site links to.
+Next session starts with: open questions above (vLLM PR link); then fix the over-claiming READMEs in kernel-level-ai-traffic-shaper and distributed-training-framework-nccl that the site links to.
